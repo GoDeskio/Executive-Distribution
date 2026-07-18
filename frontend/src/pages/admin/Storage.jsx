@@ -21,7 +21,10 @@ export default function Storage() {
   };
 
   const remove = async (id) => { if (!window.confirm("Delete asset?")) return; await api.delete(`/files/${id}`); load(); toast.success("Deleted"); };
-  const copy = (url) => { navigator.clipboard.writeText(fileUrl(url)); toast.success("URL copied"); };
+  const copy = async (url) => {
+    try { await navigator.clipboard.writeText(fileUrl(url)); toast.success("URL copied"); }
+    catch { toast.error("Copy failed — select and copy manually"); }
+  };
 
   const isImage = (ct) => ct?.startsWith("image/");
 

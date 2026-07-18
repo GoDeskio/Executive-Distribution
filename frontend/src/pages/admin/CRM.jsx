@@ -152,7 +152,10 @@ function Clients() {
     toast.success("Portal link revoked");
   };
   const portalUrl = editing?.portal_token ? `${window.location.origin}/portal/${editing.portal_token}` : "";
-  const copyPortal = () => { navigator.clipboard.writeText(portalUrl); toast.success("Link copied"); };
+  const copyPortal = async () => {
+    try { await navigator.clipboard.writeText(portalUrl); toast.success("Link copied"); }
+    catch { toast.success("Link ready — copy it from the field"); }
+  };
 
   return (
     <div>

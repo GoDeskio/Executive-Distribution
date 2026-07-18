@@ -16,7 +16,8 @@ Build a fully dynamic, professional website "Executive Distribution" (Import/Exp
 - Design: `/app/design_guidelines.json` (Playfair Display + Manrope, obsidian + steel blue).
 
 ## Implemented (2026-06)
-- **HS/tariff codes:** AI auto-suggests a 6-digit HS code per line item; editable in the quote editor; rendered on the PDF under each item.
+- **Client Portal:** each client can get a private tokenized link (`/portal/{token}`, no login) to view & download their own quotes/receipts. Admin generates/copies/revokes the link from the client record in CRM. Branded public page (logo, company, contact).
+- **HS/tariff codes:** AI auto-suggests a 6-digit HS code per line item; editable; rendered on the PDF.
 - **AI Refine/Regenerate:** inside the quote editor, an instruction box regenerates the draft (line items, totals, docs) via the AI.
 - **Direct PDF download:** generated documents are downloadable straight from the document row (and the Send-to-Client folder).
 - **Integrations (saved for later):** Settings → Integrations lets admin connect an email service (Resend/SendGrid) — provider, from-email, API key stored server-side (secrets never exposed via API). Actual email sending is NOT enabled yet.
