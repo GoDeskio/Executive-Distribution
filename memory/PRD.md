@@ -16,6 +16,7 @@ Build a fully dynamic, professional website "Executive Distribution" (Import/Exp
 - Design: `/app/design_guidelines.json` (Playfair Display + Manrope, obsidian + steel blue).
 
 ## Implemented (2026-06)
+- **RBAC fully enforced (2026-06):** All admin endpoints now use `require_perm(section)`. Completed the previously-open destructive/storage endpoints — `delete_service` (services), `update_quote`/`delete_quote` (crm), `upload_file`/`list_files`/`delete_file` (storage), `delete_document` (documents). Verified by backend testing agent (17/17 tests: superadmin allowed, sub-admins lacking the perm get 403, sub-admins with the perm allowed). `POST /api/quotes` remains intentionally public (intake form).
 - **Approval alerts + social login connect:** Settings → Integrations now has Slack approval alerts (webhook + "alert on approval" toggle; fires a best-effort Slack message when a client approves a quote, run off the event loop) and a **Stytch** social-login connect option (project id + secret + enable toggle, saved for later). All secrets sanitized from the API.
 - **Client Portal:** tokenized private link (no login) to view/download quotes/receipts, one-click **quote approval** → admin notification (bell + Dashboard Recent Activity), per-document share toggle, link expiry.
 - **HS/tariff codes:** AI-suggested per line item; editable; on the PDF.
