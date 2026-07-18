@@ -67,9 +67,17 @@ async def backup_restore(file: UploadFile = File(...), user: dict = Depends(requ
     data = await file.read()
     if not data:
         raise HTTPException(status_code=400, detail="Empty file")
+    # Auto-create a safety backup of current state before overwriting (rollback point).
+    s = await get_settings_doc()
+    safety = None
+    try:
+        info = await save_backup_to_disk(s, bool(s.get("backup_include_files", True)))
+        safety = info.get("filename")
+    except Exception:
+        pass
     try:
         restored = await restore_backup(data)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Restore failed: {str(e)[:200]}")
-    await log_action(user, "update", "settings", detail=f"restored backup: {restored}")
-    return {"ok": True, "restored": restored}
+    await log_action(user, "update", "settings", detail=f"restored backup (safety={safety}): {restored}")
+    return {"ok": True, "restored": restored, "safety_backup": safety}

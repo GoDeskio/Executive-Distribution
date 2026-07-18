@@ -101,21 +101,37 @@ def delete_disk_backup(settings: dict, filename: str) -> bool:
 
 
 async def restore_backup(zip_bytes: bytes) -> dict:
-    """DESTRUCTIVE: replaces the contents of backed-up collections and restores files."""
+    """DESTRUCTIVE but safe: snapshots current data first and rolls back on any failure."""
     buf = io.BytesIO(zip_bytes)
-    restored = {}
     with zipfile.ZipFile(buf, "r") as zf:
         raw = zf.read("data.json").decode("utf-8")
         data = json_util.loads(raw)
-        collections = data.get("collections", {})
-        for name, docs in collections.items():
-            if name not in BACKUP_COLLECTIONS:
-                continue
-            await db[name].delete_many({})
-            if docs:
-                await db[name].insert_many(docs)
-            restored[name] = len(docs)
-        # Restore object files
+        collections = {k: v for k, v in data.get("collections", {}).items() if k in BACKUP_COLLECTIONS}
+
+        # Snapshot current state so we can roll back if an insert fails midway.
+        snapshot = {}
+        for name in collections:
+            snapshot[name] = await db[name].find({}).to_list(100000)
+
+        restored = {}
+        try:
+            for name, docs in collections.items():
+                await db[name].delete_many({})
+                if docs:
+                    await db[name].insert_many(docs)
+                restored[name] = len(docs)
+        except Exception as e:
+            logger.error(f"restore failed ({e}) — rolling back to pre-restore state")
+            for name, docs in snapshot.items():
+                try:
+                    await db[name].delete_many({})
+                    if docs:
+                        await db[name].insert_many(docs)
+                except Exception as re:
+                    logger.error(f"rollback error on {name}: {re}")
+            raise RuntimeError(f"Restore aborted and rolled back: {str(e)[:150]}")
+
+        # Restore object files (non-fatal; data already committed)
         obj_count = 0
         for member in zf.namelist():
             if member.startswith("objects/") and not member.endswith("/"):
