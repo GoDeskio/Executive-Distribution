@@ -369,7 +369,7 @@ async def update_service(service_id: str, data: ServiceInput, user: dict = Depen
 
 
 @api_router.delete("/services/{service_id}")
-async def delete_service(service_id: str, user: dict = Depends(get_current_user)):
+async def delete_service(service_id: str, user: dict = Depends(require_perm("services"))):
     await db.services.delete_one({"_id": ObjectId(service_id)})
     return {"ok": True}
 
@@ -631,7 +631,7 @@ async def list_quotes(user: dict = Depends(require_perm("crm"))):
 
 
 @api_router.put("/quotes/{quote_id}")
-async def update_quote(quote_id: str, data: QuoteUpdate, user: dict = Depends(get_current_user)):
+async def update_quote(quote_id: str, data: QuoteUpdate, user: dict = Depends(require_perm("crm"))):
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
     if updates:
         await db.quotes.update_one({"_id": ObjectId(quote_id)}, {"$set": updates})
@@ -639,7 +639,7 @@ async def update_quote(quote_id: str, data: QuoteUpdate, user: dict = Depends(ge
 
 
 @api_router.delete("/quotes/{quote_id}")
-async def delete_quote(quote_id: str, user: dict = Depends(get_current_user)):
+async def delete_quote(quote_id: str, user: dict = Depends(require_perm("crm"))):
     await db.quotes.delete_one({"_id": ObjectId(quote_id)})
     return {"ok": True}
 
@@ -649,7 +649,7 @@ async def delete_quote(quote_id: str, user: dict = Depends(get_current_user)):
 # ---------------------------------------------------------------------------
 @api_router.post("/files/upload")
 async def upload_file(file: UploadFile = File(...), category: str = Form("asset"),
-                      client_id: str = Form(""), user: dict = Depends(get_current_user)):
+                      client_id: str = Form(""), user: dict = Depends(require_perm("storage"))):
     ext = file.filename.split(".")[-1].lower() if "." in file.filename else "bin"
     path = f"{APP_NAME}/{category}/{uuid.uuid4()}.{ext}"
     data = await file.read()
@@ -673,7 +673,7 @@ async def upload_file(file: UploadFile = File(...), category: str = Form("asset"
 
 
 @api_router.get("/files")
-async def list_files(category: str = None, user: dict = Depends(get_current_user)):
+async def list_files(category: str = None, user: dict = Depends(require_perm("storage"))):
     q = {"is_deleted": False}
     if category:
         q["category"] = category
@@ -698,7 +698,7 @@ async def serve_file(file_id: str):
 
 
 @api_router.delete("/files/{file_id}")
-async def delete_file(file_id: str, user: dict = Depends(get_current_user)):
+async def delete_file(file_id: str, user: dict = Depends(require_perm("storage"))):
     await db.files.update_one({"_id": ObjectId(file_id)}, {"$set": {"is_deleted": True}})
     return {"ok": True}
 
@@ -1095,7 +1095,7 @@ async def update_document(doc_id: str, data: DocumentInput, user: dict = Depends
 
 
 @api_router.delete("/documents/{doc_id}")
-async def delete_document(doc_id: str, user: dict = Depends(get_current_user)):
+async def delete_document(doc_id: str, user: dict = Depends(require_perm("documents"))):
     await db.documents.delete_one({"_id": ObjectId(doc_id)})
     return {"ok": True}
 

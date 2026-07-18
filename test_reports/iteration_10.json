@@ -1,0 +1,32 @@
+{
+  "summary": "Iteration 10: verified RBAC enforcement on the 7 newly-gated endpoints (PUT/DELETE /api/quotes/{id}, DELETE /api/services/{id}, DELETE /api/documents/{id}, POST /api/files/upload, GET /api/files, DELETE /api/files/{id}). Created a dedicated pytest suite that (a) confirms superadmin can call each without 403, (b) confirms a sub-admin with only ['dashboard'] receives 403 on all 7 AND that no DB mutation occurred, and (c) confirms a sub-admin granted crm+services+storage+documents can access each endpoint. All 17 tests passed. Temporary sub-admins and throwaway records are cleaned up in fixtures.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_rbac_gated_endpoints.py",
+    "/app/test_reports/pytest/iter10_rbac.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "require_perm is used consistently on all 7 gated endpoints; superadmin bypass works via role check in require_perm.",
+    "POST /api/quotes remains an intentional public intake endpoint (no auth) — correct per design; the CRM management verbs (PUT/DELETE) are the ones now protected.",
+    "server.py is ~1320 lines; consider splitting into modules (auth, crm, files, docs, ai) for maintainability, but no functional issue."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_rbac_gated_endpoints.py"
+  ],
+  "success_rate": {"backend": "100% (17/17)", "frontend": "skipped"},
+  "test_credentials": "admin@executivedistribution.com / Executive2025! (from /app/memory/test_credentials.md). Temporary sub-admins are per-run unique (TEST_restricted_<uuid>@exd.com, TEST_permitted_<uuid>@exd.com) and cleaned up in fixture teardown.",
+  "seed_data_creation": "Per-run throwaway records (1 quote, 1 service, 1 document, 1 file) created and deleted within fixtures; nothing leaks.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "test_rbac_gated_endpoints.py can be re-run as-is; it uses unique per-run emails so parallel runs are safe. If pytest ini enforces xdist, use `-o addopts=` or add loadscope-safe scoping. Existing test_rbac.py continues to cover the broader RBAC surface.",
+  "rca of the issue": "N/A — no defects observed. RBAC fix is enforced correctly."
+}
