@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { FileText, Download, ShieldCheck, Mail, Phone } from "lucide-react";
+import { FileText, Download, ShieldCheck, Mail, Phone, CheckCircle2, Check } from "lucide-react";
+import { toast } from "sonner";
 import api, { fileUrl } from "@/lib/api";
 
 const DTYPE = { quote: "Quote", receipt: "Receipt", customs: "Customs Doc" };
@@ -9,12 +10,23 @@ export default function Portal() {
   const { token } = useParams();
   const [data, setData] = useState(null);
   const [error, setError] = useState(false);
+  const [approving, setApproving] = useState("");
 
-  useEffect(() => {
-    api.get(`/portal/${token}`)
-      .then((r) => { setData(r.data); document.title = `${r.data.company.name} · Client Portal`; })
-      .catch(() => setError(true));
-  }, [token]);
+  const load = () => api.get(`/portal/${token}`)
+    .then((r) => { setData(r.data); document.title = `${r.data.company.name} · Client Portal`; })
+    .catch(() => setError(true));
+
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [token]);
+
+  const approve = async (docId) => {
+    setApproving(docId);
+    try {
+      await api.post(`/portal/${token}/approve`, { document_id: docId });
+      toast.success("Quote approved — thank you!");
+      load();
+    } catch (e) { toast.error("Could not approve. Please try again."); }
+    finally { setApproving(""); }
+  };
 
   if (error)
     return (
@@ -63,16 +75,27 @@ export default function Portal() {
                 <div className="flex items-center gap-4 min-w-0">
                   <FileText size={22} className="text-[#4A7C94] shrink-0" strokeWidth={1.5} />
                   <div className="min-w-0">
-                    <div className="font-medium">{d.number} · {DTYPE[d.doc_type] || d.doc_type}</div>
+                    <div className="font-medium flex items-center gap-2">
+                      {d.number} · {DTYPE[d.doc_type] || d.doc_type}
+                      {d.status === "approved" && <span className="inline-flex items-center gap-1 text-xs text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded-sm"><Check size={12} /> Approved</span>}
+                    </div>
                     <div className="text-xs text-[#71717A]">
                       {d.date}{d.destination ? ` · ${d.destination}` : ""}{d.port ? ` · ${d.port}` : ""} · ${(d.grand_total || 0).toLocaleString()}
                     </div>
                   </div>
                 </div>
-                <a data-testid={`portal-download-${i}`} href={fileUrl(d.download_url)} target="_blank" rel="noreferrer"
-                  className="shrink-0 flex items-center gap-2 bg-[#4A7C94] hover:bg-[#5A8CA4] text-white text-sm px-4 py-2.5 rounded-sm transition-colors">
-                  <Download size={16} /> Download
-                </a>
+                <div className="flex items-center gap-2 shrink-0">
+                  {d.doc_type === "quote" && d.status !== "approved" && (
+                    <button data-testid={`portal-approve-${i}`} onClick={() => approve(d.id)} disabled={approving === d.id}
+                      className="flex items-center gap-2 border border-emerald-700/60 text-emerald-300 hover:bg-emerald-950/40 text-sm px-4 py-2.5 rounded-sm transition-colors disabled:opacity-60">
+                      <CheckCircle2 size={16} /> {approving === d.id ? "…" : "Approve"}
+                    </button>
+                  )}
+                  <a data-testid={`portal-download-${i}`} href={fileUrl(d.download_url)} target="_blank" rel="noreferrer"
+                    className="flex items-center gap-2 bg-[#4A7C94] hover:bg-[#5A8CA4] text-white text-sm px-4 py-2.5 rounded-sm transition-colors">
+                    <Download size={16} /> Download
+                  </a>
+                </div>
               </div>
             ))}
           </div>

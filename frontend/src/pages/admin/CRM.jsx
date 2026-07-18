@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { Plus, Trash2, X, Users, Globe, FileText, Upload, Download, Building2, Mail, Phone, Inbox, MapPin, Link2, Copy } from "lucide-react";
 import api, { fileUrl, formatApiError } from "@/lib/api";
 import { AdminHeader } from "./AdminHeader";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
 const inp = "w-full bg-[#0A0A0B] border border-[#27272A] focus:border-[#4A7C94] outline-none rounded-sm px-3 py-2.5 text-sm transition-colors";
 const STATUS = { lead: "text-[#A1A1AA] bg-[#1A1A1D]", active: "text-emerald-300 bg-emerald-950/40", vip: "text-[#4A7C94] bg-[#4A7C94]/15", inactive: "text-[#71717A] bg-[#121214]" };
@@ -120,6 +121,7 @@ function Info({ icon: Icon, value }) {
 function Clients() {
   const [clients, setClients] = useState([]);
   const [editing, setEditing] = useState(null);
+  const [portalExpiry, setPortalExpiry] = useState("");
   const EMPTY = { name: "", company: "", email: "", phone: "", status: "lead", value: 0, tags: [], notes: "" };
 
   const load = () => api.get("/clients").then((r) => setClients(r.data)).catch(() => {});
@@ -139,8 +141,9 @@ function Clients() {
 
   const genPortal = async () => {
     try {
-      const { data } = await api.post(`/clients/${editing.id}/portal-token`);
-      setEditing((p) => ({ ...p, portal_token: data.token }));
+      const body = portalExpiry ? { expires_days: Number(portalExpiry) } : {};
+      const { data } = await api.post(`/clients/${editing.id}/portal-token`, body);
+      setEditing((p) => ({ ...p, portal_token: data.token, portal_expires_at: data.expires_at }));
       load();
       toast.success("Portal link generated");
     } catch (e) { toast.error("Could not generate link"); }
@@ -207,9 +210,15 @@ function Clients() {
                 <F l="Phone"><input value={editing.phone} onChange={(e) => setEditing({ ...editing, phone: e.target.value })} className={inp} /></F>
               </div>
               <F l="Status">
-                <select value={editing.status} onChange={(e) => setEditing({ ...editing, status: e.target.value })} className={inp}>
-                  <option value="lead">Lead</option><option value="active">Active</option><option value="vip">VIP</option><option value="inactive">Inactive</option>
-                </select>
+                <Select value={editing.status} onValueChange={(v) => setEditing({ ...editing, status: v })}>
+                  <SelectTrigger data-testid="client-status" className="bg-[#0A0A0B] border-[#27272A]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="lead">Lead</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="vip">VIP</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
               </F>
               <F l="Notes"><textarea rows={3} value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} className={inp} /></F>
 
@@ -222,14 +231,24 @@ function Clients() {
                         <input data-testid="portal-link" readOnly value={portalUrl} className={inp + " font-mono text-xs"} />
                         <button data-testid="copy-portal" onClick={copyPortal} className="shrink-0 border border-[#27272A] hover:border-[#4A7C94] rounded-sm px-3 transition-colors"><Copy size={15} /></button>
                       </div>
+                      {editing.portal_expires_at && <p className="text-xs text-amber-300/80">Expires {new Date(editing.portal_expires_at).toLocaleDateString()}</p>}
                       <div className="flex gap-3 text-xs">
                         <a href={portalUrl} target="_blank" rel="noreferrer" className="text-[#4A7C94] hover:text-white">Open portal ↗</a>
                         <button data-testid="revoke-portal" onClick={revokePortal} className="text-[#71717A] hover:text-red-400">Revoke link</button>
                       </div>
-                      <p className="text-xs text-[#71717A]">Share this private link so the client can view & download their quotes/receipts — no login required.</p>
+                      <p className="text-xs text-[#71717A]">Share this private link so the client can view, download & approve their quotes/receipts — no login required.</p>
                     </div>
                   ) : (
-                    <button data-testid="gen-portal" onClick={genPortal} className="border border-[#4A7C94]/60 text-[#4A7C94] hover:bg-[#4A7C94]/10 rounded-sm px-4 py-2 text-sm flex items-center gap-2 transition-colors"><Link2 size={15} /> Generate portal link</button>
+                    <div className="flex items-center gap-2">
+                      <select data-testid="portal-expiry" value={portalExpiry} onChange={(e) => setPortalExpiry(e.target.value)}
+                        className="bg-[#0A0A0B] border border-[#27272A] rounded-sm px-3 py-2 text-sm outline-none focus:border-[#4A7C94]">
+                        <option value="">Never expires</option>
+                        <option value="7">Expires in 7 days</option>
+                        <option value="30">Expires in 30 days</option>
+                        <option value="90">Expires in 90 days</option>
+                      </select>
+                      <button data-testid="gen-portal" onClick={genPortal} className="border border-[#4A7C94]/60 text-[#4A7C94] hover:bg-[#4A7C94]/10 rounded-sm px-4 py-2 text-sm flex items-center gap-2 transition-colors"><Link2 size={15} /> Generate portal link</button>
+                    </div>
                   )}
                 </div>
               )}

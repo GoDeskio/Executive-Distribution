@@ -1,7 +1,7 @@
 import { NavLink, useNavigate, Outlet } from "react-router-dom";
 import {
   LayoutDashboard, Package, Users, HardDrive, Search as SearchIcon, Settings as SettingsIcon,
-  User, LogOut, Ship, Sparkles, FileText,
+  User, LogOut, Ship, Sparkles, FileText, Bell,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { fileUrl } from "@/lib/api";
@@ -26,12 +26,20 @@ export default function AdminLayout() {
   const [company, setCompany] = useState("Executive Distribution");
   const [logo, setLogo] = useState("");
   const [q, setQ] = useState("");
+  const [unread, setUnread] = useState(0);
 
   useEffect(() => {
     api.get("/settings").then((r) => {
       if (r.data.company_name) setCompany(r.data.company_name);
       if (r.data.logo_url) setLogo(r.data.logo_url);
     }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const fetchCount = () => api.get("/notifications/unread-count").then((r) => setUnread(r.data.count)).catch(() => {});
+    fetchCount();
+    const t = setInterval(fetchCount, 30000);
+    return () => clearInterval(t);
   }, []);
 
   const doLogout = () => { logout(); navigate("/login"); };
@@ -48,7 +56,14 @@ export default function AdminLayout() {
               <Ship size={16} className="text-[#4A7C94]" strokeWidth={1.5} />
             </div>
           )}
-          <span className="font-display text-sm leading-tight">{company}</span>
+          <span className="font-display text-sm leading-tight truncate">{company}</span>
+          <button data-testid="notif-bell" onClick={() => navigate("/admin")} title="Notifications"
+            className="ml-auto relative text-[#A1A1AA] hover:text-white transition-colors">
+            <Bell size={18} strokeWidth={1.5} />
+            {unread > 0 && (
+              <span data-testid="notif-badge" className="absolute -top-1.5 -right-1.5 bg-[#4A7C94] text-white text-[10px] leading-none rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{unread > 9 ? "9+" : unread}</span>
+            )}
+          </button>
         </div>
 
         <form onSubmit={doSearch} className="px-3 pt-4">

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
-import { Users, Eye, Briefcase, Package, Activity, Inbox } from "lucide-react";
+import { Users, Eye, Briefcase, Package, Activity, Inbox, CheckCircle2, Bell } from "lucide-react";
 import api from "@/lib/api";
 import { AdminHeader } from "./AdminHeader";
 
@@ -30,6 +30,7 @@ export default function Dashboard() {
   const [heat, setHeat] = useState([]);
   const [heatPath, setHeatPath] = useState("/");
   const [pathOptions, setPathOptions] = useState(PAGE_OPTIONS);
+  const [notifs, setNotifs] = useState([]);
 
   useEffect(() => {
     api.get("/analytics/overview").then((r) => setOverview(r.data)).catch(() => {});
@@ -38,6 +39,10 @@ export default function Dashboard() {
       setPages(r.data);
       const opts = r.data.map((p) => ({ path: p.path, label: p.path }));
       if (opts.length) setPathOptions(opts);
+    }).catch(() => {});
+    api.get("/notifications").then((r) => {
+      setNotifs(r.data);
+      if (r.data.some((n) => !n.read)) api.post("/notifications/read").catch(() => {});
     }).catch(() => {});
   }, []);
 
@@ -96,6 +101,24 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
+        </div>
+
+        {/* RECENT ACTIVITY */}
+        <div className="bg-[#121214] border border-[#27272A] rounded-md p-6">
+          <div className="flex items-center gap-2 label-caps mb-5"><Bell size={14} /> Recent Activity</div>
+          {notifs.length === 0 ? (
+            <p className="text-sm text-[#71717A]">No activity yet. Client quote approvals from the portal will appear here.</p>
+          ) : (
+            <div className="space-y-3">
+              {notifs.slice(0, 8).map((n) => (
+                <div key={n.id} data-testid={`notif-${n.id}`} className="flex items-center gap-3 text-sm border-b border-[#27272A]/50 pb-3 last:border-0">
+                  <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                  <span className="flex-1"><span className="font-medium">{n.client_name}</span> approved quote <span className="font-mono text-xs text-[#4A7C94]">{n.document_number}</span></span>
+                  <span className="text-xs text-[#71717A]">{n.created_at ? new Date(n.created_at).toLocaleString() : ""}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* HEATMAP */}

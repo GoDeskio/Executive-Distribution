@@ -320,14 +320,22 @@ async def delete_client(client_id: str, user: dict = Depends(get_current_user)):
     return {"ok": True}
 
 
+class PortalTokenInput(BaseModel):
+    expires_days: Optional[int] = None
+
+
 @api_router.post("/clients/{client_id}/portal-token")
-async def generate_portal_token(client_id: str, user: dict = Depends(get_current_user)):
+async def generate_portal_token(client_id: str, data: PortalTokenInput = PortalTokenInput(),
+                                user: dict = Depends(get_current_user)):
     import secrets
     token = secrets.token_urlsafe(16)
-    res = await db.clients.update_one({"_id": ObjectId(client_id)}, {"$set": {"portal_token": token}})
+    updates = {"portal_token": token, "portal_expires_at": None}
+    if data and data.expires_days:
+        updates["portal_expires_at"] = (datetime.now(timezone.utc) + timedelta(days=int(data.expires_days))).isoformat()
+    res = await db.clients.update_one({"_id": ObjectId(client_id)}, {"$set": updates})
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Client not found")
-    return {"token": token}
+    return {"token": token, "expires_at": updates["portal_expires_at"]}
 
 
 @api_router.delete("/clients/{client_id}/portal-token")
@@ -336,18 +344,29 @@ async def revoke_portal_token(client_id: str, user: dict = Depends(get_current_u
     return {"ok": True}
 
 
+def _portal_expired(client: dict) -> bool:
+    exp = client.get("portal_expires_at")
+    if not exp:
+        return False
+    try:
+        return datetime.now(timezone.utc) > datetime.fromisoformat(exp)
+    except Exception:
+        return False
+
+
 @api_router.get("/portal/{token}")
 async def client_portal(token: str):
     client = await db.clients.find_one({"portal_token": token})
-    if not client:
+    if not client or _portal_expired(client):
         raise HTTPException(status_code=404, detail="Portal not found")
     settings = await _get_settings_doc()
     cid = str(client["_id"])
-    docs = await db.documents.find({"client_id": cid, "pdf_file_id": {"$ne": None}}).sort("created_at", -1).to_list(500)
+    docs = await db.documents.find({"client_id": cid, "pdf_file_id": {"$ne": None}, "shared": {"$ne": False}}).sort("created_at", -1).to_list(500)
     documents = [{
+        "id": str(d["_id"]),
         "number": d.get("number"), "doc_type": d.get("doc_type"), "date": d.get("date"),
         "grand_total": d.get("grand_total", 0), "port": d.get("port", ""),
-        "destination": d.get("destination", ""),
+        "destination": d.get("destination", ""), "status": d.get("status", "generated"),
         "download_url": f"/api/files/{d['pdf_file_id']}/raw",
     } for d in docs]
     return {
@@ -361,6 +380,54 @@ async def client_portal(token: str):
         },
         "documents": documents,
     }
+
+
+class PortalApproveInput(BaseModel):
+    document_id: str
+
+
+@api_router.post("/portal/{token}/approve")
+async def portal_approve(token: str, data: PortalApproveInput):
+    client = await db.clients.find_one({"portal_token": token})
+    if not client or _portal_expired(client):
+        raise HTTPException(status_code=404, detail="Portal not found")
+    doc = await db.documents.find_one({"_id": ObjectId(data.document_id), "client_id": str(client["_id"])})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    await db.documents.update_one({"_id": doc["_id"]}, {"$set": {"status": "approved", "approved_at": now_iso()}})
+    await db.notifications.insert_one({
+        "type": "quote_approved", "client_name": client.get("name", ""),
+        "document_number": doc.get("number", ""), "document_id": str(doc["_id"]),
+        "read": False, "created_at": now_iso(),
+    })
+    return {"ok": True, "status": "approved"}
+
+
+@api_router.post("/documents/{doc_id}/share")
+async def toggle_share(doc_id: str, payload: dict, user: dict = Depends(get_current_user)):
+    shared = bool(payload.get("shared", True))
+    await db.documents.update_one({"_id": ObjectId(doc_id)}, {"$set": {"shared": shared}})
+    return {"ok": True, "shared": shared}
+
+
+# ---------------------------------------------------------------------------
+# Notifications
+# ---------------------------------------------------------------------------
+@api_router.get("/notifications")
+async def list_notifications(user: dict = Depends(get_current_user)):
+    docs = await db.notifications.find({}).sort("created_at", -1).to_list(50)
+    return [clean(d) for d in docs]
+
+
+@api_router.get("/notifications/unread-count")
+async def unread_count(user: dict = Depends(get_current_user)):
+    return {"count": await db.notifications.count_documents({"read": False})}
+
+
+@api_router.post("/notifications/read")
+async def mark_read(user: dict = Depends(get_current_user)):
+    await db.notifications.update_many({"read": False}, {"$set": {"read": True}})
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
@@ -762,6 +829,7 @@ class DocumentInput(BaseModel):
     grand_total: float = 0
     notes: str = ""
     status: str = "draft"
+    shared: bool = True
 
 
 async def _next_number(doc_type: str) -> str:

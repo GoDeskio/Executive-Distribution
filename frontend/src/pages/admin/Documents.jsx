@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, X, FileText, Download, FileCheck, FolderDown, Wand2, Sparkles } from "lucide-react";
+import { Plus, Trash2, X, FileText, Download, FileCheck, FolderDown, Wand2, Sparkles, Eye, EyeOff } from "lucide-react";
 import api, { fileUrl, formatApiError } from "@/lib/api";
 import { AdminHeader } from "./AdminHeader";
 
@@ -68,6 +68,13 @@ function Builder() {
   };
 
   const remove = async (id) => { if (!window.confirm("Delete document?")) return; await api.delete(`/documents/${id}`); load(); toast.success("Deleted"); };
+
+  const toggleShare = async (d) => {
+    const next = d.shared === false; // if currently hidden -> share
+    await api.post(`/documents/${d.id}/share`, { shared: next });
+    setDocs((list) => list.map((x) => (x.id === d.id ? { ...x, shared: next } : x)));
+    toast.success(next ? "Visible on client portal" : "Hidden from client portal");
+  };
 
   const generate = async (id) => {
     toast.loading("Generating PDF…", { id: "gen" });
@@ -162,6 +169,10 @@ function Builder() {
                 <td className="px-6 py-4"><span className={`text-xs px-2 py-1 rounded-sm ${d.status === "generated" ? "text-emerald-300 bg-emerald-950/40" : "text-[#A1A1AA] bg-[#1A1A1D]"}`}>{d.status}</span></td>
                 <td className="px-6 py-4 text-[#71717A] text-xs">{d.date}</td>
                 <td className="px-6 py-4 text-right whitespace-nowrap">
+                  <button data-testid={`share-${d.id}`} onClick={() => toggleShare(d)} title={d.shared === false ? "Hidden from portal — click to share" : "Shared to portal — click to hide"}
+                    className={`inline-block p-1 mr-1 ${d.shared === false ? "text-[#71717A] hover:text-white" : "text-[#4A7C94] hover:text-white"}`}>
+                    {d.shared === false ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
                   {d.pdf_file_id && (
                     <a data-testid={`row-download-${d.id}`} href={fileUrl(`/api/files/${d.pdf_file_id}/raw`)} target="_blank" rel="noreferrer" title="Download PDF" className="inline-block text-emerald-400 hover:text-white p-1 mr-1"><Download size={15} /></a>
                   )}
