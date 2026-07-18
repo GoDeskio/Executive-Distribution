@@ -1,0 +1,34 @@
+{
+  "summary": "Post-refactor backend regression pass. Built a new dedicated suite tests/test_refactor_regression.py (28 tests, 11 test classes) exercising every area called out in the review: auth (login/me/profile), brute-force lockout on a throwaway sub-admin (locks at threshold, blocks correct password during lock), services CRUD + public GET by slug + ?all=true, clients CRM CRUD + client/{id}/documents + portal-token generate/revoke, public client portal GET + POST approve (creates notification), documents CRUD + share toggle + generate (PDF creates file + sets pdf_file_id) + ai-draft (accepts 200 with structure OR clean 4xx/502), quotes public multipart intake + gated list + PUT returns updated object with echoed status + DELETE, files upload/list/delete gated + raw public serve returns bytes, analytics /track public + all 5 dashboard-gated endpoints, /api/ai/status + /api/calculate, settings sanitization (no raw secret keys; has_* booleans present), settings PUT gated, /api/sitemap.xml valid XML including /services/ URLs, /api/robots.txt with Sitemap line, /api/search shape, and full RBAC regression (sub-admin without perm -> 403 on crm/services/documents/storage/settings; sub-admin with perms -> 200; unauth -> 401). Result: 28/28 passed. Also re-ran previous suites tests/test_rbac.py (12/12) and tests/test_rbac_gated_endpoints.py (16/17 — the single failure is the pre-existing xdist race on a shared throwaway quote noted in the review; not a refactor regression). No behavioral regressions from the monolith->modular split were observed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "tests/test_rbac_gated_endpoints.py::test_super_put_quote", "issue": "Pre-existing xdist race: two workers share a single throwaway quote_id; one DELETEs it while another PUTs it, causing PUT to return None (document already deleted). Not a code/refactor regression — the endpoint itself is correct (verified by TestQuotes::test_list_and_put_returns_updated in the new suite which uses per-test isolated data)."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_refactor_regression.py",
+    "/app/test_reports/pytest/iter11_refactor.xml"
+  ],
+  "action_items": [
+    "(Optional, low priority) De-flake tests/test_rbac_gated_endpoints.py by making TestSuperadminHitsGatedEndpoints create its own quote per-test (or scope the shared fixture per xdist worker) so the ordering race disappears."
+  ],
+  "critical_code_review_comments": [
+    "Refactor is clean: server.py is now 87 lines, each router module 24–226 lines, and core/security.py centralizes auth. All routers correctly use prefix='/api'. No behavioral drift detected across 28 verification points.",
+    "settings.py sanitization correctly strips ai_own_key / email_api_key / slack_webhook_url / stytch_secret from GET /api/settings responses and emits has_* booleans, and the PUT handler pops has_* flags before persisting — no secret leak.",
+    "auth.py lockout counter resets on successful login (failed_attempts=0, locked_until=None) and enforces 429 both on hitting the threshold and on subsequent correct-password attempts during the lock window — verified end-to-end on a throwaway sub-admin, then defaults restored (5/15).",
+    "documents.py ai-draft returns HTTP 502 with a clear detail message when the AI provider fails and 422 when the response is not parseable JSON — no crashes.",
+    "quotes.py PUT /api/quotes/{quote_id} correctly returns the updated document (status echoed back) — validated in isolation.",
+    "server.py seed_admin correctly re-hashes the admin password if it differs from ADMIN_PASSWORD env, so the credentials in /app/memory/test_credentials.md always work after a restart.",
+    "Minor (nit): CORSMiddleware uses allow_origins=['*'] with allow_credentials=False — fine for current token-in-Authorization-header design; if cookies are ever used cross-site this must change to explicit origins with credentials=True."
+  ],
+  "updated_files": ["/app/backend/tests/test_refactor_regression.py"],
+  "success_rate": {"backend": "100% (28/28 in new regression suite; 12/12 test_rbac.py; 16/17 test_rbac_gated_endpoints.py with 1 known pre-existing xdist race)", "frontend": "skipped"},
+  "test_credentials": "admin@executivedistribution.com / Executive2025! (from /app/memory/test_credentials.md). Throwaway sub-admins are TEST_sub_<uuid>@exd.com created and deleted inside each test/fixture.",
+  "seed_data_creation": "Per-test throwaway records (sub-admins, services, clients, documents, quotes, files) are created and deleted within each test; lockout settings mutated temporarily and restored to prior values (default 5/15).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "tests/test_refactor_regression.py is the canonical post-refactor regression suite; safe to re-run under xdist (uses per-run unique emails/records and restores mutated settings). The single failure in test_rbac_gated_endpoints.py::test_super_put_quote is a known ordering race in that older suite's shared quote fixture — main agent may want to de-flake by scoping the fixture per-worker or per-test. Refactor is confirmed byte-behavior-identical to the pre-split monolith across all 28 verification points listed in the review request.",
+  "rca of the issue": "N/A — no defects introduced by the refactor. The one failing pre-existing test is a fixture-scoping race (shared quote across xdist workers), not a code bug in routers/quotes.py."
+}

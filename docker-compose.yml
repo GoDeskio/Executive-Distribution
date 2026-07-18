@@ -37,6 +37,23 @@ services:
     ports:
       - "3000:3000"
 
+  # --- Optional: single-origin reverse proxy (recommended for production) ---
+  # Uncomment to serve the whole app on port 80 and get clean /sitemap.xml and
+  # /robots.txt at the site root. When enabled, set REACT_APP_BACKEND_URL to your
+  # public domain (e.g. https://yourdomain.com) so the browser calls /api on the
+  # same origin.
+  #
+  # proxy:
+  #   image: nginx:1.27-alpine
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - frontend
+  #     - backend
+  #   volumes:
+  #     - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+  #   ports:
+  #     - "80:80"
+
 volumes:
   mongo_data:
   uploads_data:
