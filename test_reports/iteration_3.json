@@ -1,0 +1,27 @@
+{
+  "summary": "Iteration 3 focused on the NEW AI assistant, fee calculator, quotes/documents + watermarked PDF, Send-to-Client folder, and global search. Added /app/backend/tests/test_new_features.py with 13 pytest tests — ALL PASS (13/13). Playwright E2E covered public chat widget streaming, admin login, AI status indicator, Fee Calculator formula match, New Quote modal + save, PDF generate + popup, Send-to-Client folder listing, and global search from both sidebar and /admin/search (by name, by quote number EXD-Q-00001, and by 'Acme'). All flows pass end-to-end.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_new_features.py",
+    "/app/test_reports/pytest/pytest_new_features.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is now ~950 lines — well past the 700-line soft threshold. Strongly recommend splitting into routers (ai.py already exists; add documents.py, search.py, quotes.py, files.py).",
+    "GET /api/settings correctly sanitizes ai_own_key -> has_own_key (verified in test_settings_get_sanitizes_ai_own_key). Good.",
+    "AI status 'source' field: backend returns 'emergent' or 'own', but the Documents/AiAssistant UI checks `status.source === 'own'`. Confirmed consistent — but consider adding an explicit contract/enum.",
+    "POST /api/calculate is public (no auth). Not a leak, but consider rate-limiting since it's an easy compute-abuse target.",
+    "POST /api/documents does not validate that line_items totals actually sum to grand_total server-side — client controls both. Low priority since it only affects the PDF output for the admin's own client.",
+    "generate_document uses count_documents+1 for numbering. If two admins click Generate concurrently this can race and produce duplicate numbers. Consider an atomic counter (findAndModify).",
+    "Global search regex uses re.escape which is good; no ReDoS risk. Limits queries to 25 rows per collection — reasonable."
+  ],
+  "updated_files": ["/app/backend/tests/test_new_features.py"],
+  "success_rate": {"backend": "100% (13/13 new tests; iteration-1/2 suite still green)", "frontend": "100% of AI/calc/documents/search flows"},
+  "test_credentials": "admin@executivedistribution.com / Executive2025! (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Backend tests create/delete TEST_-prefixed documents and files. Playwright creates one 'UITest Client XYZ' quote and deletes it via UI confirm dialog. Seed EXD-Q-00001 (Acme) was still discoverable via /api/search 'EXD-Q-00001' before cleanup.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "New tests live in /app/backend/tests/test_new_features.py. Key contract points already verified: (a) GET /api/settings NEVER returns ai_own_key — only has_own_key bool; (b) POST /api/ai/chat streams as raw text/plain (not SSE); (c) POST /api/calculate rules match DEFAULT_FEE_RULES: freight=weight*4.5*mode_mult*qty (ocean=1.0, air=2.6, ground=0.7), handling=75 flat, port=120 flat, insurance=1.5% of declared, customs=8% of declared, vat=5% of (declared+freight+customs), grand=declared+fees_total+customs+vat. Sample: value=1000, weight=100, ocean -> grand_total=1816.50 (verified in UI + backend). (d) POST /api/documents auto-generates number EXD-Q-#####; /generate produces valid %PDF- output and writes to 'send_to_client' category; frontend downloads via /api/files/{id}/raw. (e) /api/search groups results into clients/requests/documents and matches on many fields incl. line_items.item. (f) AI status format: {source:'emergent'|'own', provider, model, has_own_key}.",
+  "rca of the issue": "No blocking issues. Only code-review observations documented above."
+}

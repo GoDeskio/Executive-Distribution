@@ -16,6 +16,9 @@ import Storage from "@/pages/admin/Storage";
 import SEO from "@/pages/admin/SEO";
 import Settings from "@/pages/admin/Settings";
 import Profile from "@/pages/admin/Profile";
+import AiAssistant from "@/pages/admin/AiAssistant";
+import Documents from "@/pages/admin/Documents";
+import Search from "@/pages/admin/Search";
 
 function Tracked() {
   useTracking();
@@ -26,6 +29,9 @@ function Tracked() {
       <Route path="/login" element={<Login />} />
       <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
+        <Route path="ai" element={<AiAssistant />} />
+        <Route path="documents" element={<Documents />} />
+        <Route path="search" element={<Search />} />
         <Route path="services" element={<ServicesAdmin />} />
         <Route path="crm" element={<CRM />} />
         <Route path="storage" element={<Storage />} />

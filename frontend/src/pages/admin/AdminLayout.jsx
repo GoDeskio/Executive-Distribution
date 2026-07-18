@@ -1,7 +1,7 @@
 import { NavLink, useNavigate, Outlet } from "react-router-dom";
 import {
-  LayoutDashboard, Package, Users, HardDrive, Search, Settings as SettingsIcon,
-  User, LogOut, Ship,
+  LayoutDashboard, Package, Users, HardDrive, Search as SearchIcon, Settings as SettingsIcon,
+  User, LogOut, Ship, Sparkles, FileText,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { fileUrl } from "@/lib/api";
@@ -10,10 +10,12 @@ import api from "@/lib/api";
 
 const NAV = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/admin/ai", label: "AI Assistant", icon: Sparkles },
+  { to: "/admin/documents", label: "Quotes & Docs", icon: FileText },
   { to: "/admin/services", label: "Services", icon: Package },
   { to: "/admin/crm", label: "CRM", icon: Users },
   { to: "/admin/storage", label: "Object Storage", icon: HardDrive },
-  { to: "/admin/seo", label: "SEO Controls", icon: Search },
+  { to: "/admin/seo", label: "SEO Controls", icon: SearchIcon },
   { to: "/admin/settings", label: "Settings", icon: SettingsIcon },
   { to: "/admin/profile", label: "Profile", icon: User },
 ];
@@ -23,6 +25,7 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const [company, setCompany] = useState("Executive Distribution");
   const [logo, setLogo] = useState("");
+  const [q, setQ] = useState("");
 
   useEffect(() => {
     api.get("/settings").then((r) => {
@@ -32,6 +35,7 @@ export default function AdminLayout() {
   }, []);
 
   const doLogout = () => { logout(); navigate("/login"); };
+  const doSearch = (e) => { e.preventDefault(); if (q.trim()) navigate(`/admin/search?q=${encodeURIComponent(q.trim())}`); };
 
   return (
     <div className="min-h-screen bg-[#0A0A0B] flex">
@@ -47,9 +51,17 @@ export default function AdminLayout() {
           <span className="font-display text-sm leading-tight">{company}</span>
         </div>
 
-        <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
+        <form onSubmit={doSearch} className="px-3 pt-4">
+          <div className="relative">
+            <SearchIcon size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#71717A]" />
+            <input data-testid="global-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…"
+              className="w-full bg-[#121214] border border-[#27272A] focus:border-[#4A7C94] outline-none rounded-sm pl-9 pr-3 py-2 text-sm transition-colors" />
+          </div>
+        </form>
+
+        <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
           {NAV.map((n) => (
-            <NavLink key={n.to} to={n.to} end={n.end} data-testid={`nav-${n.label.toLowerCase().replace(/\s/g, "-")}`}
+            <NavLink key={n.to} to={n.to} end={n.end} data-testid={`nav-${n.label.toLowerCase().replace(/[\s&]+/g, "-")}`}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-2.5 rounded-sm text-sm transition-colors ${
                   isActive ? "bg-[#4A7C94]/15 text-[#4A7C94] border-l-2 border-[#4A7C94]" : "text-[#A1A1AA] hover:bg-[#121214] hover:text-white border-l-2 border-transparent"

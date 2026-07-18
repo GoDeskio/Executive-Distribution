@@ -6,7 +6,7 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File, Form, Query, Header
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, BeforeValidator, EmailStr
@@ -103,36 +103,11 @@ async def get_current_user(request: Request) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Object storage
+# Object storage (portable — see storage.py)
 # ---------------------------------------------------------------------------
-storage_key = None
-
-
-def init_storage():
-    global storage_key
-    if storage_key:
-        return storage_key
-    resp = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_KEY}, timeout=30)
-    resp.raise_for_status()
-    storage_key = resp.json()["storage_key"]
-    return storage_key
-
-
-def put_object(path: str, data: bytes, content_type: str) -> dict:
-    key = init_storage()
-    resp = requests.put(f"{STORAGE_URL}/objects/{path}",
-                        headers={"X-Storage-Key": key, "Content-Type": content_type},
-                        data=data, timeout=120)
-    resp.raise_for_status()
-    return resp.json()
-
-
-def get_object(path: str):
-    key = init_storage()
-    resp = requests.get(f"{STORAGE_URL}/objects/{path}",
-                        headers={"X-Storage-Key": key}, timeout=60)
-    resp.raise_for_status()
-    return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
+from storage import init_storage, put_object, get_object
+import ai as ai_helper
+from pdf_utils import generate_document_pdf
 
 
 MIME_TYPES = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "gif": "image/gif",
@@ -294,6 +269,8 @@ async def get_settings():
     if not doc:
         return {}
     doc.pop("_id", None)
+    own = (doc.pop("ai_own_key", "") or "").strip()
+    doc["has_own_key"] = bool(own)
     return doc
 
 
@@ -569,6 +546,285 @@ async def analytics_visitors(user: dict = Depends(get_current_user)):
 
 
 # ---------------------------------------------------------------------------
+# AI Assistant (chat)
+# ---------------------------------------------------------------------------
+async def _get_settings_doc():
+    doc = await db.settings.find_one({"_id": "site"}) or {}
+    doc.pop("_id", None)
+    return doc
+
+
+PUBLIC_SYSTEM = (
+    "You are the Executive Distribution AI concierge on a premium import/export & product sourcing "
+    "company website. You help visitors estimate shipping fees, explain which documents they will need "
+    "for customs/shipping, and answer questions about services (freight forwarding, port logistics, "
+    "cigar sourcing, coffee distribution, Larimar/mineral supply, warehousing). Be concise, professional "
+    "and helpful. When a visitor wants a formal quote, encourage them to submit the Request a Quote form "
+    "with item details, destination and reference images. Never invent client data. Give fee figures as "
+    "clearly-labeled estimates."
+)
+
+ADMIN_SYSTEM = (
+    "You are the Executive Distribution operations assistant for staff. You act as a logistics calculator "
+    "and documentation expert: compute and explain shipping fees, customs duties and taxes, and list the "
+    "exact documents required for a given shipment (e.g. commercial invoice, packing list, bill of lading, "
+    "certificate of origin, import/export licenses, insurance certificate, phytosanitary/CITES where relevant). "
+    "Help draft quotes and receipts and organize records per client. Be precise, use clear line-item "
+    "breakdowns, and state assumptions."
+)
+
+
+class ChatInput(BaseModel):
+    session_id: str
+    message: str
+    history: List[dict] = []
+    scope: str = "public"  # public | admin
+
+
+async def _chat_stream(payload: ChatInput, is_admin: bool):
+    settings = await _get_settings_doc()
+    system = ADMIN_SYSTEM if is_admin else PUBLIC_SYSTEM
+    collected = []
+
+    async def gen():
+        async for chunk in ai_helper.stream_reply(payload.session_id, system, payload.history, payload.message, settings):
+            collected.append(chunk)
+            yield chunk
+        # persist
+        try:
+            await db.chat_messages.insert_one({
+                "session_id": payload.session_id, "scope": "admin" if is_admin else "public",
+                "user": payload.message, "assistant": "".join(collected), "created_at": now_iso(),
+            })
+        except Exception:
+            pass
+
+    return StreamingResponse(gen(), media_type="text/plain",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@api_router.post("/ai/chat")
+async def ai_chat_public(payload: ChatInput):
+    return await _chat_stream(payload, is_admin=False)
+
+
+@api_router.post("/ai/chat/admin")
+async def ai_chat_admin(payload: ChatInput, user: dict = Depends(get_current_user)):
+    return await _chat_stream(payload, is_admin=True)
+
+
+@api_router.get("/ai/status")
+async def ai_status(user: dict = Depends(get_current_user)):
+    settings = await _get_settings_doc()
+    cfg = ai_helper.resolve_ai_config(settings)
+    return {"source": cfg["source"], "provider": cfg["provider"], "model": cfg["model"],
+            "has_own_key": bool((settings.get("ai_own_key") or "").strip())}
+
+
+# ---------------------------------------------------------------------------
+# Fee / customs calculator (rule-based) + AI document guidance
+# ---------------------------------------------------------------------------
+DEFAULT_FEE_RULES = {
+    "freight_rate_per_kg": 4.5,
+    "handling_fee_flat": 75.0,
+    "insurance_pct": 1.5,
+    "duty_pct": 8.0,
+    "vat_pct": 5.0,
+    "port_surcharge": 120.0,
+}
+
+
+class CalcInput(BaseModel):
+    item_name: str = ""
+    declared_value: float = 0
+    weight_kg: float = 0
+    quantity: int = 1
+    origin: str = ""
+    destination: str = ""
+    mode: str = "ocean"  # ocean | air | ground
+
+
+@api_router.post("/calculate")
+async def calculate(data: CalcInput):
+    settings = await _get_settings_doc()
+    rules = {**DEFAULT_FEE_RULES, **(settings.get("fee_rules") or {})}
+    mode_mult = {"ocean": 1.0, "air": 2.6, "ground": 0.7}.get(data.mode, 1.0)
+
+    freight = data.weight_kg * rules["freight_rate_per_kg"] * mode_mult * max(data.quantity, 1)
+    handling = rules["handling_fee_flat"]
+    port = rules["port_surcharge"]
+    insurance = data.declared_value * rules["insurance_pct"] / 100.0
+    customs = data.declared_value * rules["duty_pct"] / 100.0
+    taxable = data.declared_value + freight + customs
+    vat = taxable * rules["vat_pct"] / 100.0
+    fees_total = round(freight + handling + port + insurance, 2)
+    grand = round(data.declared_value + fees_total + customs + vat, 2)
+
+    return {
+        "breakdown": {
+            "declared_value": round(data.declared_value, 2),
+            "freight": round(freight, 2),
+            "handling": round(handling, 2),
+            "port_surcharge": round(port, 2),
+            "insurance": round(insurance, 2),
+            "customs_duty": round(customs, 2),
+            "vat_tax": round(vat, 2),
+        },
+        "fees_total": fees_total,
+        "customs_total": round(customs, 2),
+        "tax_total": round(vat, 2),
+        "grand_total": grand,
+        "rules_used": rules,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Documents / Quotes builder (formal quotes, receipts, customs docs)
+# ---------------------------------------------------------------------------
+class LineItem(BaseModel):
+    item: str = ""
+    qty: float = 1
+    unit_price: float = 0
+    fees: float = 0
+    customs: float = 0
+    total: float = 0
+
+
+class DocumentInput(BaseModel):
+    doc_type: str = "quote"  # quote | receipt | customs
+    client_id: str = ""
+    client_name: str = ""
+    client_company: str = ""
+    client_email: str = ""
+    client_phone: str = ""
+    destination: str = ""
+    port: str = ""
+    po_number: str = ""
+    tracking_number: str = ""
+    date: str = ""
+    line_items: List[LineItem] = []
+    subtotal: float = 0
+    fees_total: float = 0
+    customs_total: float = 0
+    tax_total: float = 0
+    grand_total: float = 0
+    notes: str = ""
+    status: str = "draft"
+
+
+async def _next_number(doc_type: str) -> str:
+    prefix = {"quote": "EXD-Q", "receipt": "EXD-R", "customs": "EXD-C"}.get(doc_type, "EXD")
+    count = await db.documents.count_documents({"doc_type": doc_type}) + 1
+    return f"{prefix}-{count:05d}"
+
+
+@api_router.get("/documents")
+async def list_documents(user: dict = Depends(get_current_user)):
+    docs = await db.documents.find({}).sort("created_at", -1).to_list(1000)
+    return [clean(d) for d in docs]
+
+
+@api_router.post("/documents")
+async def create_document(data: DocumentInput, user: dict = Depends(get_current_user)):
+    doc = data.model_dump()
+    doc["line_items"] = [li for li in doc["line_items"]]
+    doc["number"] = await _next_number(data.doc_type)
+    if not doc.get("date"):
+        doc["date"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    doc["created_at"] = now_iso()
+    doc["pdf_file_id"] = None
+    res = await db.documents.insert_one(doc)
+    return clean(await db.documents.find_one({"_id": res.inserted_id}))
+
+
+@api_router.put("/documents/{doc_id}")
+async def update_document(doc_id: str, data: DocumentInput, user: dict = Depends(get_current_user)):
+    doc = data.model_dump()
+    await db.documents.update_one({"_id": ObjectId(doc_id)}, {"$set": doc})
+    return clean(await db.documents.find_one({"_id": ObjectId(doc_id)}))
+
+
+@api_router.delete("/documents/{doc_id}")
+async def delete_document(doc_id: str, user: dict = Depends(get_current_user)):
+    await db.documents.delete_one({"_id": ObjectId(doc_id)})
+    return {"ok": True}
+
+
+async def _fetch_logo_bytes(settings: dict):
+    logo_url = settings.get("logo_url") or ""
+    try:
+        if logo_url.startswith("/api/files/"):
+            fid = logo_url.split("/api/files/")[1].split("/")[0]
+            rec = await db.files.find_one({"_id": ObjectId(fid)})
+            if rec:
+                data, _ = get_object(rec["storage_path"])
+                return data
+        elif logo_url.startswith("http"):
+            r = requests.get(logo_url, timeout=15)
+            if r.ok:
+                return r.content
+    except Exception as e:
+        logger.warning(f"logo fetch failed: {e}")
+    return None
+
+
+@api_router.post("/documents/{doc_id}/generate")
+async def generate_document(doc_id: str, user: dict = Depends(get_current_user)):
+    doc = await db.documents.find_one({"_id": ObjectId(doc_id)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    settings = await _get_settings_doc()
+    logo_bytes = await _fetch_logo_bytes(settings)
+    pdf_bytes = generate_document_pdf(clean(dict(doc)), settings, logo_bytes)
+
+    filename = f'{doc.get("number","document")}.pdf'
+    path = f"{APP_NAME}/send-to-client/{uuid.uuid4()}.pdf"
+    result = put_object(path, pdf_bytes, "application/pdf")
+    frec = {
+        "storage_path": result["path"], "original_filename": filename,
+        "content_type": "application/pdf", "size": result.get("size", len(pdf_bytes)),
+        "category": "send_to_client", "client_id": doc.get("client_id") or None,
+        "document_id": str(doc["_id"]), "is_deleted": False, "created_at": now_iso(),
+    }
+    fres = await db.files.insert_one(frec)
+    await db.documents.update_one({"_id": doc["_id"]},
+                                  {"$set": {"pdf_file_id": str(fres.inserted_id), "status": "generated"}})
+    return {"ok": True, "file_id": str(fres.inserted_id), "url": f"/api/files/{str(fres.inserted_id)}/raw"}
+
+
+# ---------------------------------------------------------------------------
+# Global search
+# ---------------------------------------------------------------------------
+@api_router.get("/search")
+async def global_search(q: str = "", user: dict = Depends(get_current_user)):
+    q = (q or "").strip()
+    if not q:
+        return {"clients": [], "quotes": [], "requests": [], "documents": []}
+    rx = {"$regex": re.escape(q), "$options": "i"}
+
+    clients = await db.clients.find({"$or": [
+        {"name": rx}, {"email": rx}, {"phone": rx}, {"company": rx},
+    ]}).limit(25).to_list(25)
+
+    requests_ = await db.quotes.find({"$or": [
+        {"name": rx}, {"email": rx}, {"phone": rx}, {"company": rx},
+        {"destination": rx}, {"description": rx},
+    ]}).limit(25).to_list(25)
+
+    documents = await db.documents.find({"$or": [
+        {"client_name": rx}, {"client_email": rx}, {"client_phone": rx}, {"client_company": rx},
+        {"number": rx}, {"po_number": rx}, {"tracking_number": rx}, {"port": rx},
+        {"destination": rx}, {"date": rx}, {"line_items.item": rx},
+    ]}).limit(25).to_list(25)
+
+    return {
+        "clients": [clean(c) for c in clients],
+        "requests": [clean(r) for r in requests_],
+        "documents": [clean(d) for d in documents],
+    }
+
+
+# ---------------------------------------------------------------------------
 # Startup
 # ---------------------------------------------------------------------------
 DEFAULT_SERVICES = [
@@ -622,6 +878,18 @@ DEFAULT_SETTINGS = {
     "seo_title": "Executive Distribution | Global Import, Export & Product Sourcing",
     "seo_description": "Premium import/export and product sourcing. Freight forwarding, port logistics, cigars, coffee, Larimar and warehousing — handled with executive precision.",
     "seo_keywords": "import export, product sourcing, freight forwarding, cigar sourcing, coffee distribution, larimar supply, warehousing",
+    "ai_provider": "openai",
+    "ai_model": "gpt-5.4",
+    "ai_use_own_key": False,
+    "ai_own_key": "",
+    "fee_rules": {
+        "freight_rate_per_kg": 4.5,
+        "handling_fee_flat": 75.0,
+        "insurance_pct": 1.5,
+        "duty_pct": 8.0,
+        "vat_pct": 5.0,
+        "port_surcharge": 120.0,
+    },
 }
 
 

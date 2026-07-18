@@ -7,6 +7,7 @@ import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { ServiceIcon } from "@/components/site/ServiceIcon";
 import { QuoteForm } from "@/components/site/QuoteForm";
+import { ChatWidget } from "@/components/site/ChatWidget";
 
 const fade = {
   hidden: { opacity: 0, y: 30 },
@@ -171,6 +172,7 @@ export default function Home() {
       </section>
 
       <Footer />
+      <ChatWidget />
     </div>
   );
 }

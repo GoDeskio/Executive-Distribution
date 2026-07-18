@@ -6,6 +6,7 @@ import api from "@/lib/api";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { ServiceIcon } from "@/components/site/ServiceIcon";
+import { ChatWidget } from "@/components/site/ChatWidget";
 
 export default function ServiceDetail() {
   const { slug } = useParams();
@@ -122,6 +123,7 @@ export default function ServiceDetail() {
       )}
 
       <Footer />
+      <ChatWidget />
     </div>
   );
 }
