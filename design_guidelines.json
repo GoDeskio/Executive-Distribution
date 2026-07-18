@@ -1,0 +1,152 @@
+{
+  "project_name": "Executive Distribution",
+  "app_type": "hybrid_fullstack",
+  "theme": "dark_mode_default",
+  "design_philosophy": "Luxury/Swiss High-Contrast Archetype. Dark masculine color palette with steel blue/gunmetal accents. The website must feel expensive, industrial yet highly polished. Avoid pure black; use rich deep grays to reduce eye fatigue and create a premium, muted canvas for high-contrast imagery.",
+  "colors": {
+    "backgrounds": {
+      "base": "#0A0A0B",
+      "surface": "#121214",
+      "surface_elevated": "#1A1A1D",
+      "glass": "rgba(26, 26, 29, 0.65)"
+    },
+    "accents": {
+      "primary": "#4A7C94",
+      "primary_hover": "#5A8CA4",
+      "gunmetal": "#2A3439",
+      "steel_blue": "#3E5B70"
+    },
+    "text": {
+      "primary": "#F4F4F5",
+      "secondary": "#A1A1AA",
+      "muted": "#71717A",
+      "inverse": "#0A0A0B"
+    },
+    "borders": {
+      "subtle": "#27272A",
+      "active": "#4A7C94"
+    },
+    "rules": [
+      "NEVER use pure #000000.",
+      "Desaturate accent colors to avoid vibration against dark backgrounds.",
+      "Use backdrop-blur-xl with rgba glass backgrounds for sticky headers and elevated cards."
+    ]
+  },
+  "typography": {
+    "heading_font": "Playfair Display",
+    "body_font": "Manrope",
+    "scales": {
+      "h1": "text-5xl sm:text-6xl tracking-tight leading-none font-black",
+      "h2": "text-3xl sm:text-4xl tracking-tight leading-tight font-bold",
+      "h3": "text-2xl font-semibold",
+      "h4": "text-xl font-medium",
+      "body": "text-base leading-relaxed",
+      "label": "text-xs tracking-[0.2em] uppercase font-bold text-[#A1A1AA]"
+    },
+    "rules": [
+      "DO NOT use Inter for headings.",
+      "Use Playfair Display for all marketing headings to convey luxury and old-money B2B trust.",
+      "Use Manrope for the admin dashboard, CRM, and body copy for ultimate legibility."
+    ]
+  },
+  "layouts": {
+    "marketing_site": {
+      "container": "max-w-7xl mx-auto px-6 lg:px-12",
+      "hero_section": "Min-height 90vh. Use a large, muted dark overlay (bg-black/40) over a full-screen cargo ship or port image. Content should be left-aligned or asymmetric.",
+      "services_grid": "The 'Tetris' Grid. gap-8 or gap-12. Avoid boring equal squares. Use col-span-12 md:col-span-6 lg:col-span-4 for the service cards. Cards must have the image on top, title, and short description, with generous internal padding (p-8)."
+    },
+    "admin_dashboard": {
+      "structure": "Sidebar layout. Left sidebar (w-64) with fixed position. Main content area with top header.",
+      "sidebar_menu": "Links for: Dashboard (Heatmap), CRM (Clients/Visitors), Object Storage (Assets/Documents), SEO Controls, Settings, Profile.",
+      "density": "High Density Grid for CRM and analytics widgets. Tight gaps (gap-4). Widgets use flat solid surfaces with 1px border (#27272A) and no heavy drop shadows."
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-[#4A7C94] text-white hover:bg-[#5A8CA4] transition-colors rounded-sm px-6 py-3 font-medium",
+      "secondary": "border border-[#27272A] bg-transparent text-[#F4F4F5] hover:bg-[#1A1A1D] transition-colors rounded-sm px-6 py-3 font-medium"
+    },
+    "cards": {
+      "service_card": "bg-[#121214] border border-[#27272A] overflow-hidden group cursor-pointer transition-transform hover:-translate-y-1 hover:border-[#4A7C94]",
+      "service_card_image": "h-48 w-full object-cover filter grayscale group-hover:grayscale-0 transition-all duration-500",
+      "dashboard_widget": "bg-[#121214] border border-[#27272A] rounded-md p-6"
+    },
+    "heatmap": {
+      "library": "Recharts (Shadcn Chart wrapper) or Visx",
+      "style": "Use a custom tooltip and dark theme. Grid lines should be very subtle (#27272A). The heatmap cells should range from #121214 (empty) to #4A7C94 (high activity)."
+    },
+    "navigation": {
+      "header": "Sticky top-0 z-50 backdrop-blur-xl bg-[#0A0A0B]/80 border-b border-[#27272A]. Must not be fully transparent."
+    }
+  },
+  "motion": {
+    "hover_states": "All cards lift slightly (-translate-y-1) and their borders illuminate to the primary accent color.",
+    "page_transitions": "Fade in and slide up (framer-motion).",
+    "image_reveal": "Images inside service cards transition from grayscale to full color on hover."
+  },
+  "media": {
+    "images": {
+      "cargo_ship_night": {
+        "url": "https://images.pexels.com/photos/14734004/pexels-photo-14734004.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Large container ship docked at twilight. Use for Hero Section."
+      },
+      "freighter_ocean": {
+        "url": "https://images.unsplash.com/photo-1568347877321-f8935c7dc5a3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA0MTJ8MHwxfHNlYXJjaHwxfHxjYXJnbyUyMHNoaXAlMjBmcmVpZ2h0ZXIlMjBuaWdodHxlbnwwfHx8fDE3ODQzOTA0Njd8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Red and white cargo ship. Use for Import/Export Service Card."
+      },
+      "industrial_port": {
+        "url": "https://images.unsplash.com/photo-1554769944-3138b076c38a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzV8MHwxfHNlYXJjaHwxfHxpbmR1c3RyaWFsJTIwcG9ydCUyMGRyb25lfGVufDB8fHx8MTc4NDM5MDQ2N3ww&ixlib=rb-4.1.0&q=85",
+        "description": "Aerial view of shipping containers. Use for Port Logistics Service Card."
+      },
+      "cigar_factory": {
+        "url": "https://images.pexels.com/photos/3975055/pexels-photo-3975055.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Cigars near wooden boxes. Use for Specialty Sourcing (Cigars) Service Card."
+      },
+      "coffee_distribution": {
+        "url": "https://images.unsplash.com/photo-1606486544554-164d98da4889?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MDV8MHwxfHNlYXJjaHwzfHxjb2ZmZWUlMjBiZWFuJTIwZGlzdHJpYnV0aW9ufGVufDB8fHx8MTc4NDM5MDQ2N3ww&ixlib=rb-4.1.0&q=85",
+        "description": "Premium coffee beans. Use for Agricultural Sourcing Service Card."
+      },
+      "warehouse_manager": {
+        "url": "https://images.pexels.com/photos/4487365/pexels-photo-4487365.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Two workers managing inventory. Use for About Us / CRM Dashboard Placeholder."
+      },
+      "larimar_warehouse": {
+        "url": "https://images.unsplash.com/photo-1767131545090-e13ae86c8e13?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzJ8MHwxfHNlYXJjaHwzfHxibHVlJTIwZ2Vtc3RvbmUlMjByb3VnaHxlbnwwfHx8fDE3ODQzOTA0NzR8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Raw minerals/gemstones. Use for Larimar Supply Service Card."
+      }
+    },
+    "icons": "Use lucide-react for all standard icons. For the dashboard sidebar, ensure stroke width is 1.5 for a premium, delicate look."
+  },
+  "instructions_to_main_agent": {
+    "setup": [
+      "Install Playfair Display and Manrope from Google Fonts.",
+      "Initialize Tailwind CSS with the provided custom colors.",
+      "Set up Shadcn UI for the dashboard components (Cards, Tables, Tabs, Inputs)."
+    ],
+    "marketing_site_dev": [
+      "Build a sticky header with glassmorphism.",
+      "Build the Hero Section using the 'cargo_ship_night' image as a background. Ensure text contrast is perfect.",
+      "Build a Services Grid where cards map to individual detail pages. Cards must feature the specified images at the top.",
+      "Implement a fully dynamic service description page template."
+    ],
+    "dashboard_dev": [
+      "Create a layout wrapper with a fixed left sidebar and scrollable main content.",
+      "Sidebar must include: Settings, Profile, Object Storage (Assets/Documents), CRM, SEO Controls, Heatmap Analytics.",
+      "Build the CRM view using Shadcn Table to manage clients and visitors.",
+      "Build the Heatmap Analytics view using Recharts to visualize visitor activity.",
+      "Implement Object Storage UI (grid of documents/assets)."
+    ],
+    "accessibility": "Ensure all text contrast meets WCAG AA standards. Include aria-labels on icon buttons. Provide data-testid on all interactive elements."
+  },
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "NEVER use generic centered layouts or simplistic gradients. Create depth through layered design elements with z-index hierarchy.",
+    "Do NOT apply 'transition: all' globally. Target specific properties.",
+    "Do NOT center align the app container in global CSS.",
+    "Use modern button styles (sharp corners or subtle 2px rounding) to fit the masculine industrial aesthetic.",
+    "NEVER use AI assistant emoji characters (🤖🧠💭💡🔮🎯) for icons.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "All interactive elements MUST include a 'data-testid' attribute (e.g., data-testid='login-submit').",
+    "Missing categories = you MUST NOT use placeholder text. Use the provided image URLs.",
+    "Use 'sonner' for toast notifications."
+  ]
+}
