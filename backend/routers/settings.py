@@ -4,11 +4,15 @@ from fastapi.responses import Response
 
 from core.db import db
 from core.security import require_any_perm, require_perm
-from core.settings_store import get_settings_doc, resolve_base_url
+from core.settings_store import get_settings_doc, resolve_base_url, DEFAULT_SETTINGS
 from core.seo_ping import ping_now, maybe_autoping
 from core.audit import log_action
 
 router = APIRouter(prefix="/api")
+
+# Only these keys may be written through the public settings API. Internal cache
+# keys (e.g. update_available, update_latest_*) are set by the server, not clients.
+ALLOWED_SETTING_KEYS = set(DEFAULT_SETTINGS.keys())
 
 
 def _sanitize_settings(doc: dict) -> dict:
@@ -37,12 +41,11 @@ async def get_settings():
 
 @router.put("/settings")
 async def update_settings(payload: dict, user: dict = Depends(require_any_perm("settings", "seo"))):
-    payload.pop("_id", None)
-    payload.pop("has_own_key", None)
-    payload.pop("has_email_key", None)
-    payload.pop("has_slack_webhook", None)
-    payload.pop("has_stytch_secret", None)
-    payload.pop("has_update_token", None)
+    # Whitelist: silently drop unknown/internal keys to prevent field injection.
+    payload = {k: v for k, v in payload.items() if k in ALLOWED_SETTING_KEYS}
+    if not payload:
+        doc = await db.settings.find_one({"_id": "site"})
+        return _sanitize_settings(doc)
     seo_touched = any(k in payload for k in ("page_seo", "seo_title", "seo_description", "seo_keywords", "site_url"))
     await db.settings.update_one({"_id": "site"}, {"$set": payload}, upsert=True)
     await log_action(user, "update", "settings", detail=", ".join(sorted(payload.keys()))[:200])

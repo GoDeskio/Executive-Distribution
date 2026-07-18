@@ -23,19 +23,28 @@ async def list_audit(limit: int = 100, entity: str = None, action: str = None,
 
 
 @router.get("/audit/export.csv")
-async def export_audit(entity: str = None, action: str = None, user: dict = Depends(require_superadmin)):
+async def export_audit(entity: str = None, action: str = None, limit: int = 50000,
+                       skip: int = 0, user: dict = Depends(require_superadmin)):
     q = {}
     if entity:
         q["entity"] = entity
     if action:
         q["action"] = action
-    docs = await db.audit_logs.find(q).sort("created_at", -1).to_list(5000)
-    buf = io.StringIO()
-    writer = csv.writer(buf)
-    writer.writerow(["created_at", "user_email", "user_name", "action", "entity", "entity_id", "detail"])
-    for d in docs:
-        writer.writerow([d.get("created_at", ""), d.get("user_email", ""), d.get("user_name", ""),
-                         d.get("action", ""), d.get("entity", ""), d.get("entity_id", ""), d.get("detail", "")])
-    buf.seek(0)
-    return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
+    limit = min(max(limit, 1), 100000)
+    skip = max(skip, 0)
+
+    async def rows():
+        header = io.StringIO()
+        csv.writer(header).writerow(
+            ["created_at", "user_email", "user_name", "action", "entity", "entity_id", "detail"])
+        yield header.getvalue()
+        cursor = db.audit_logs.find(q).sort("created_at", -1).skip(skip).limit(limit)
+        async for d in cursor:
+            line = io.StringIO()
+            csv.writer(line).writerow([
+                d.get("created_at", ""), d.get("user_email", ""), d.get("user_name", ""),
+                d.get("action", ""), d.get("entity", ""), d.get("entity_id", ""), d.get("detail", "")])
+            yield line.getvalue()
+
+    return StreamingResponse(rows(), media_type="text/csv",
                              headers={"Content-Disposition": "attachment; filename=audit-log.csv"})
