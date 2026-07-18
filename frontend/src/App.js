@@ -4,6 +4,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/context/AuthContext";
 import { useTracking } from "@/hooks/useTracking";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { PermGuard } from "@/components/PermGuard";
+import Team from "@/pages/admin/Team";
 
 import Home from "@/pages/Home";
 import ServiceDetail from "@/pages/ServiceDetail";
@@ -30,15 +32,16 @@ function Tracked() {
       <Route path="/login" element={<Login />} />
       <Route path="/portal/:token" element={<Portal />} />
       <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
-        <Route index element={<Dashboard />} />
-        <Route path="ai" element={<AiAssistant />} />
-        <Route path="documents" element={<Documents />} />
+        <Route index element={<PermGuard perm="dashboard"><Dashboard /></PermGuard>} />
+        <Route path="ai" element={<PermGuard perm="ai"><AiAssistant /></PermGuard>} />
+        <Route path="documents" element={<PermGuard perm="documents"><Documents /></PermGuard>} />
         <Route path="search" element={<Search />} />
-        <Route path="services" element={<ServicesAdmin />} />
-        <Route path="crm" element={<CRM />} />
-        <Route path="storage" element={<Storage />} />
-        <Route path="seo" element={<SEO />} />
-        <Route path="settings" element={<Settings />} />
+        <Route path="services" element={<PermGuard perm="services"><ServicesAdmin /></PermGuard>} />
+        <Route path="crm" element={<PermGuard perm="crm"><CRM /></PermGuard>} />
+        <Route path="storage" element={<PermGuard perm="storage"><Storage /></PermGuard>} />
+        <Route path="seo" element={<PermGuard perm="seo"><SEO /></PermGuard>} />
+        <Route path="team" element={<PermGuard superOnly><Team /></PermGuard>} />
+        <Route path="settings" element={<PermGuard perm="settings"><Settings /></PermGuard>} />
         <Route path="profile" element={<Profile />} />
       </Route>
     </Routes>

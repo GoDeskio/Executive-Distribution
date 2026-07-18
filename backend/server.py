@@ -95,11 +95,43 @@ async def get_current_user(request: Request) -> dict:
         user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
+        if user.get("active") is False:
+            raise HTTPException(status_code=403, detail="Account disabled")
         return clean(user)
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+
+ALL_PERMS = ["dashboard", "ai", "documents", "services", "crm", "storage", "seo", "settings", "search"]
+
+
+def is_super(user: dict) -> bool:
+    return user.get("role") == "superadmin"
+
+
+async def require_superadmin(user: dict = Depends(get_current_user)) -> dict:
+    if not is_super(user):
+        raise HTTPException(status_code=403, detail="Super admin access required")
+    return user
+
+
+def require_perm(perm: str):
+    async def checker(user: dict = Depends(get_current_user)) -> dict:
+        if is_super(user) or perm in (user.get("permissions") or []):
+            return user
+        raise HTTPException(status_code=403, detail=f"You don't have access to the {perm} section")
+    return checker
+
+
+def require_any_perm(*perms):
+    async def checker(user: dict = Depends(get_current_user)) -> dict:
+        ups = user.get("permissions") or []
+        if is_super(user) or any(p in ups for p in perms):
+            return user
+        raise HTTPException(status_code=403, detail="You don't have access to this section")
+    return checker
 
 
 # ---------------------------------------------------------------------------
@@ -211,6 +243,88 @@ async def update_profile(data: ProfileUpdate, user: dict = Depends(get_current_u
 
 
 # ---------------------------------------------------------------------------
+# User management (super admin only)
+# ---------------------------------------------------------------------------
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    name: str = ""
+    permissions: List[str] = []
+
+
+class UserManageUpdate(BaseModel):
+    name: Optional[str] = None
+    permissions: Optional[List[str]] = None
+    active: Optional[bool] = None
+
+
+class UserPassword(BaseModel):
+    password: str
+
+
+@api_router.get("/users")
+async def list_users(user: dict = Depends(require_superadmin)):
+    docs = await db.users.find({}).sort("created_at", 1).to_list(200)
+    return [clean(d) for d in docs]
+
+
+@api_router.get("/permissions")
+async def list_permissions(user: dict = Depends(require_superadmin)):
+    return {"permissions": ALL_PERMS}
+
+
+@api_router.post("/users")
+async def create_user(data: UserCreate, user: dict = Depends(require_superadmin)):
+    email = data.email.lower()
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=400, detail="A user with this email already exists")
+    perms = [p for p in data.permissions if p in ALL_PERMS]
+    doc = {"email": email, "password_hash": hash_password(data.password), "name": data.name or email.split("@")[0],
+           "role": "subadmin", "permissions": perms, "active": True, "avatar_url": "", "created_at": now_iso()}
+    res = await db.users.insert_one(doc)
+    return clean(await db.users.find_one({"_id": res.inserted_id}))
+
+
+@api_router.put("/users/{user_id}")
+async def update_user(user_id: str, data: UserManageUpdate, user: dict = Depends(require_superadmin)):
+    target = await db.users.find_one({"_id": ObjectId(user_id)})
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target.get("role") == "superadmin":
+        raise HTTPException(status_code=400, detail="Cannot modify a super admin account here")
+    updates = {}
+    if data.name is not None:
+        updates["name"] = data.name
+    if data.permissions is not None:
+        updates["permissions"] = [p for p in data.permissions if p in ALL_PERMS]
+    if data.active is not None:
+        updates["active"] = data.active
+    if updates:
+        await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": updates})
+    return clean(await db.users.find_one({"_id": ObjectId(user_id)}))
+
+
+@api_router.post("/users/{user_id}/password")
+async def reset_user_password(user_id: str, data: UserPassword, user: dict = Depends(require_superadmin)):
+    target = await db.users.find_one({"_id": ObjectId(user_id)})
+    if not target or target.get("role") == "superadmin":
+        raise HTTPException(status_code=400, detail="Cannot reset this account's password")
+    await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": {"password_hash": hash_password(data.password)}})
+    return {"ok": True}
+
+
+@api_router.delete("/users/{user_id}")
+async def delete_user(user_id: str, user: dict = Depends(require_superadmin)):
+    target = await db.users.find_one({"_id": ObjectId(user_id)})
+    if not target:
+        return {"ok": True}
+    if target.get("role") == "superadmin":
+        raise HTTPException(status_code=400, detail="Cannot remove a super admin")
+    await db.users.delete_one({"_id": ObjectId(user_id)})
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
 # Services
 # ---------------------------------------------------------------------------
 @api_router.get("/services")
@@ -231,7 +345,7 @@ async def get_service(slug: str):
 
 
 @api_router.post("/services")
-async def create_service(data: ServiceInput, user: dict = Depends(get_current_user)):
+async def create_service(data: ServiceInput, user: dict = Depends(require_perm("services"))):
     doc = data.model_dump()
     base = slugify(data.title)
     slug = base
@@ -247,7 +361,7 @@ async def create_service(data: ServiceInput, user: dict = Depends(get_current_us
 
 
 @api_router.put("/services/{service_id}")
-async def update_service(service_id: str, data: ServiceInput, user: dict = Depends(get_current_user)):
+async def update_service(service_id: str, data: ServiceInput, user: dict = Depends(require_perm("services"))):
     doc = data.model_dump()
     doc["updated_at"] = now_iso()
     await db.services.update_one({"_id": ObjectId(service_id)}, {"$set": doc})
@@ -281,7 +395,7 @@ async def get_settings():
 
 
 @api_router.put("/settings")
-async def update_settings(payload: dict, user: dict = Depends(get_current_user)):
+async def update_settings(payload: dict, user: dict = Depends(require_any_perm("settings", "seo"))):
     payload.pop("_id", None)
     payload.pop("has_own_key", None)
     payload.pop("has_email_key", None)
@@ -311,7 +425,7 @@ async def list_clients(user: dict = Depends(get_current_user)):
 
 
 @api_router.post("/clients")
-async def create_client(data: ClientInput, user: dict = Depends(get_current_user)):
+async def create_client(data: ClientInput, user: dict = Depends(require_perm("crm"))):
     doc = data.model_dump()
     doc["created_at"] = now_iso()
     res = await db.clients.insert_one(doc)
@@ -319,13 +433,13 @@ async def create_client(data: ClientInput, user: dict = Depends(get_current_user
 
 
 @api_router.put("/clients/{client_id}")
-async def update_client(client_id: str, data: ClientInput, user: dict = Depends(get_current_user)):
+async def update_client(client_id: str, data: ClientInput, user: dict = Depends(require_perm("crm"))):
     await db.clients.update_one({"_id": ObjectId(client_id)}, {"$set": data.model_dump()})
     return clean(await db.clients.find_one({"_id": ObjectId(client_id)}))
 
 
 @api_router.delete("/clients/{client_id}")
-async def delete_client(client_id: str, user: dict = Depends(get_current_user)):
+async def delete_client(client_id: str, user: dict = Depends(require_perm("crm"))):
     await db.clients.delete_one({"_id": ObjectId(client_id)})
     return {"ok": True}
 
@@ -336,7 +450,7 @@ class PortalTokenInput(BaseModel):
 
 @api_router.post("/clients/{client_id}/portal-token")
 async def generate_portal_token(client_id: str, data: PortalTokenInput = PortalTokenInput(),
-                                user: dict = Depends(get_current_user)):
+                                user: dict = Depends(require_perm("crm"))):
     import secrets
     token = secrets.token_urlsafe(16)
     updates = {"portal_token": token, "portal_expires_at": None}
@@ -349,7 +463,7 @@ async def generate_portal_token(client_id: str, data: PortalTokenInput = PortalT
 
 
 @api_router.delete("/clients/{client_id}/portal-token")
-async def revoke_portal_token(client_id: str, user: dict = Depends(get_current_user)):
+async def revoke_portal_token(client_id: str, user: dict = Depends(require_perm("crm"))):
     await db.clients.update_one({"_id": ObjectId(client_id)}, {"$unset": {"portal_token": ""}})
     return {"ok": True}
 
@@ -433,7 +547,7 @@ async def portal_approve(token: str, data: PortalApproveInput):
 
 
 @api_router.post("/documents/{doc_id}/share")
-async def toggle_share(doc_id: str, payload: dict, user: dict = Depends(get_current_user)):
+async def toggle_share(doc_id: str, payload: dict, user: dict = Depends(require_perm("documents"))):
     shared = bool(payload.get("shared", True))
     await db.documents.update_one({"_id": ObjectId(doc_id)}, {"$set": {"shared": shared}})
     return {"ok": True, "shared": shared}
@@ -511,7 +625,7 @@ class QuoteUpdate(BaseModel):
 
 
 @api_router.get("/quotes")
-async def list_quotes(user: dict = Depends(get_current_user)):
+async def list_quotes(user: dict = Depends(require_perm("crm"))):
     docs = await db.quotes.find({}).sort("created_at", -1).to_list(1000)
     return [clean(d) for d in docs]
 
@@ -624,7 +738,7 @@ async def track(data: TrackInput, request: Request):
 
 
 @api_router.get("/analytics/overview")
-async def analytics_overview(user: dict = Depends(get_current_user)):
+async def analytics_overview(user: dict = Depends(require_perm("dashboard"))):
     total_visitors = await db.visitors.count_documents({})
     total_views = await db.events.count_documents({"event_type": "pageview"})
     total_clients = await db.clients.count_documents({})
@@ -647,7 +761,7 @@ async def analytics_overview(user: dict = Depends(get_current_user)):
 
 
 @api_router.get("/analytics/timeseries")
-async def analytics_timeseries(days: int = 14, user: dict = Depends(get_current_user)):
+async def analytics_timeseries(days: int = 14, user: dict = Depends(require_perm("dashboard"))):
     start = datetime.now(timezone.utc) - timedelta(days=days)
     pipeline = [
         {"$match": {"event_type": "pageview", "created_at": {"$gte": start.isoformat()}}},
@@ -666,7 +780,7 @@ async def analytics_timeseries(days: int = 14, user: dict = Depends(get_current_
 
 
 @api_router.get("/analytics/pages")
-async def analytics_pages(user: dict = Depends(get_current_user)):
+async def analytics_pages(user: dict = Depends(require_perm("dashboard"))):
     pipeline = [
         {"$match": {"event_type": "pageview"}},
         {"$group": {"_id": "$path", "views": {"$sum": 1}}},
@@ -678,7 +792,7 @@ async def analytics_pages(user: dict = Depends(get_current_user)):
 
 
 @api_router.get("/analytics/heatmap")
-async def analytics_heatmap(path: str = "/", user: dict = Depends(get_current_user)):
+async def analytics_heatmap(path: str = "/", user: dict = Depends(require_perm("dashboard"))):
     docs = await db.events.find(
         {"event_type": "click", "path": path, "x": {"$ne": None}, "y": {"$ne": None}},
         {"x": 1, "y": 1, "_id": 0}
@@ -687,7 +801,7 @@ async def analytics_heatmap(path: str = "/", user: dict = Depends(get_current_us
 
 
 @api_router.get("/analytics/visitors")
-async def analytics_visitors(user: dict = Depends(get_current_user)):
+async def analytics_visitors(user: dict = Depends(require_perm("dashboard"))):
     docs = await db.visitors.find({}).sort("last_seen", -1).to_list(500)
     return [clean(d) for d in docs]
 
@@ -756,7 +870,7 @@ async def ai_chat_public(payload: ChatInput):
 
 
 @api_router.post("/ai/chat/admin")
-async def ai_chat_admin(payload: ChatInput, user: dict = Depends(get_current_user)):
+async def ai_chat_admin(payload: ChatInput, user: dict = Depends(require_perm("ai"))):
     return await _chat_stream(payload, is_admin=True)
 
 
@@ -883,7 +997,7 @@ def _compute_line(declared_value, weight_kg, qty, mode, rules):
 
 
 @api_router.post("/documents/ai-draft")
-async def ai_draft_document(data: AiDraftInput, user: dict = Depends(get_current_user)):
+async def ai_draft_document(data: AiDraftInput, user: dict = Depends(require_perm("documents"))):
     import json
     settings = await _get_settings_doc()
     rules = {**DEFAULT_FEE_RULES, **(settings.get("fee_rules") or {})}
@@ -955,13 +1069,13 @@ async def ai_draft_document(data: AiDraftInput, user: dict = Depends(get_current
 
 
 @api_router.get("/documents")
-async def list_documents(user: dict = Depends(get_current_user)):
+async def list_documents(user: dict = Depends(require_perm("documents"))):
     docs = await db.documents.find({}).sort("created_at", -1).to_list(1000)
     return [clean(d) for d in docs]
 
 
 @api_router.post("/documents")
-async def create_document(data: DocumentInput, user: dict = Depends(get_current_user)):
+async def create_document(data: DocumentInput, user: dict = Depends(require_perm("documents"))):
     doc = data.model_dump()
     doc["line_items"] = [li for li in doc["line_items"]]
     doc["number"] = await _next_number(data.doc_type)
@@ -974,7 +1088,7 @@ async def create_document(data: DocumentInput, user: dict = Depends(get_current_
 
 
 @api_router.put("/documents/{doc_id}")
-async def update_document(doc_id: str, data: DocumentInput, user: dict = Depends(get_current_user)):
+async def update_document(doc_id: str, data: DocumentInput, user: dict = Depends(require_perm("documents"))):
     doc = data.model_dump()
     await db.documents.update_one({"_id": ObjectId(doc_id)}, {"$set": doc})
     return clean(await db.documents.find_one({"_id": ObjectId(doc_id)}))
@@ -1005,7 +1119,7 @@ async def _fetch_logo_bytes(settings: dict):
 
 
 @api_router.post("/documents/{doc_id}/generate")
-async def generate_document(doc_id: str, user: dict = Depends(get_current_user)):
+async def generate_document(doc_id: str, user: dict = Depends(require_perm("documents"))):
     doc = await db.documents.find_one({"_id": ObjectId(doc_id)})
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -1152,12 +1266,21 @@ async def startup():
     existing = await db.users.find_one({"email": admin_email})
     if not existing:
         await db.users.insert_one({"email": admin_email, "password_hash": hash_password(admin_password),
-                                   "name": "Executive Admin", "role": "admin", "avatar_url": "",
-                                   "created_at": now_iso()})
-        logger.info("Seeded admin user")
-    elif not verify_password(admin_password, existing["password_hash"]):
-        await db.users.update_one({"email": admin_email},
-                                  {"$set": {"password_hash": hash_password(admin_password)}})
+                                   "name": "Executive Admin", "role": "superadmin", "permissions": ALL_PERMS,
+                                   "active": True, "avatar_url": "", "created_at": now_iso()})
+        logger.info("Seeded superadmin user")
+    else:
+        updates = {}
+        if existing.get("role") != "superadmin":
+            updates["role"] = "superadmin"
+        if not existing.get("permissions"):
+            updates["permissions"] = ALL_PERMS
+        if existing.get("active") is None:
+            updates["active"] = True
+        if not verify_password(admin_password, existing["password_hash"]):
+            updates["password_hash"] = hash_password(admin_password)
+        if updates:
+            await db.users.update_one({"email": admin_email}, {"$set": updates})
 
     if await db.services.count_documents({}) == 0:
         for i, s in enumerate(DEFAULT_SERVICES):

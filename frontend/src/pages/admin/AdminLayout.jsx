@@ -1,7 +1,7 @@
 import { NavLink, useNavigate, Outlet } from "react-router-dom";
 import {
   LayoutDashboard, Package, Users, HardDrive, Search as SearchIcon, Settings as SettingsIcon,
-  User, LogOut, Ship, Sparkles, FileText, Bell,
+  User, LogOut, Ship, Sparkles, FileText, Bell, Shield,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { fileUrl } from "@/lib/api";
@@ -9,14 +9,15 @@ import { useEffect, useState } from "react";
 import api from "@/lib/api";
 
 const NAV = [
-  { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
-  { to: "/admin/ai", label: "AI Assistant", icon: Sparkles },
-  { to: "/admin/documents", label: "Quotes & Docs", icon: FileText },
-  { to: "/admin/services", label: "Services", icon: Package },
-  { to: "/admin/crm", label: "CRM", icon: Users },
-  { to: "/admin/storage", label: "Object Storage", icon: HardDrive },
-  { to: "/admin/seo", label: "SEO Controls", icon: SearchIcon },
-  { to: "/admin/settings", label: "Settings", icon: SettingsIcon },
+  { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true, perm: "dashboard" },
+  { to: "/admin/ai", label: "AI Assistant", icon: Sparkles, perm: "ai" },
+  { to: "/admin/documents", label: "Quotes & Docs", icon: FileText, perm: "documents" },
+  { to: "/admin/services", label: "Services", icon: Package, perm: "services" },
+  { to: "/admin/crm", label: "CRM", icon: Users, perm: "crm" },
+  { to: "/admin/storage", label: "Object Storage", icon: HardDrive, perm: "storage" },
+  { to: "/admin/seo", label: "SEO Controls", icon: SearchIcon, perm: "seo" },
+  { to: "/admin/team", label: "Team & Access", icon: Shield, superOnly: true },
+  { to: "/admin/settings", label: "Settings", icon: SettingsIcon, perm: "settings" },
   { to: "/admin/profile", label: "Profile", icon: User },
 ];
 
@@ -44,6 +45,14 @@ export default function AdminLayout() {
 
   const doLogout = () => { logout(); navigate("/login"); };
   const doSearch = (e) => { e.preventDefault(); if (q.trim()) navigate(`/admin/search?q=${encodeURIComponent(q.trim())}`); };
+
+  const isSuper = user?.role === "superadmin";
+  const canSee = (n) => {
+    if (n.superOnly) return isSuper;
+    if (!n.perm) return true; // profile always
+    return isSuper || (user?.permissions || []).includes(n.perm);
+  };
+  const visibleNav = NAV.filter(canSee);
 
   return (
     <div className="min-h-screen bg-[#0A0A0B] flex">
@@ -75,7 +84,7 @@ export default function AdminLayout() {
         </form>
 
         <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-          {NAV.map((n) => (
+          {visibleNav.map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end} data-testid={`nav-${n.label.toLowerCase().replace(/[\s&]+/g, "-")}`}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-2.5 rounded-sm text-sm transition-colors ${

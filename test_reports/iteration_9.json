@@ -1,0 +1,35 @@
+{
+  "summary": "Tested RBAC/sub-admin feature end-to-end. Backend pytest (12 tests) 11/12 pass; one real RBAC bypass found on GET /api/clients. Frontend: fixed missing PermGuard/Team imports in App.js (was crashing the entire app), then verified super-admin nav shows Team & Access, sub-admin creation with limited perms, sub-admin nav filtering (Dashboard/CRM/Profile only), route-guard redirects for /admin/services, /admin/team, /admin/documents, edit permissions, password reset, disable, and delete flows.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/clients", "issue": "Uses only Depends(get_current_user) instead of require_perm('crm'). Any authenticated user (including sub-admins WITHOUT crm permission) can list all clients. Confirmed: sub-admin with permissions=['documents','dashboard'] gets 200 on GET /api/clients. All other GET CRM endpoints (POST/PUT/DELETE /clients, GET/POST /quotes, /portal-token) are correctly gated. Fix: change server.py line 422 to `user: dict = Depends(require_perm('crm'))`.", "priority": "HIGH"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "App.js", "issue": "Was missing `import { PermGuard } from '@/components/PermGuard'` and `import Team from '@/pages/admin/Team'` — routes referenced them and the entire app crashed with 'PermGuard is not defined'. Fixed during testing (added imports).", "selector": "n/a", "priority": "CRITICAL (fixed)"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_rbac.py", "/app/test_reports/pytest/pytest_rbac.xml"],
+  "action_items": [
+    "Backend: gate GET /api/clients with require_perm('crm') to prevent cross-section data leak to sub-admins without CRM access.",
+    "Verify no other GET endpoints missing permission guards (spot-check confirmed /documents, /quotes, /analytics/* are correct; /services GET is intentionally public)."
+  ],
+  "critical_code_review_comments": [
+    "GET /api/clients missing require_perm — permission bypass allowing any authenticated user to enumerate clients.",
+    "App.js was crashing at import-time because PermGuard/Team were referenced without imports. Ship-blocking regression that main agent's own smoke test should have caught (I fixed imports so testing could proceed).",
+    "Team.jsx: KeyRound (reset-pw) and Ban (enable/disable) buttons lack data-testid. Only `edit-user-{id}` and `delete-user-{id}` have testids. Consider adding `reset-pw-btn-{id}` and `toggle-active-{id}` for cleaner tests.",
+    "get_current_user re-reads DB on every request (good — perm changes take immediate effect on next call, verified). Disabled users are correctly rejected with 403 by /auth/me and all protected endpoints on subsequent calls."
+  ],
+  "updated_files": ["/app/frontend/src/App.js", "/app/backend/tests/test_rbac.py"],
+  "success_rate": {"backend": "92% (11/12 rbac tests; failure is the real /api/clients bypass bug)", "frontend": "100% after import fix"},
+  "test_credentials": "Super admin: admin@executivedistribution.com / Executive2025!. Test sub-admin (created+deleted during test): crmtest@exd.com / SubPass123!",
+  "seed_data_creation": "None persisted. Test sub-admin crmtest@exd.com was created and cleaned up.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "test_rbac.py covers: super-admin auth/me/all-sections/self-protection, sub-admin login/allowed/denied endpoints, edit-persist, password reset, disable-blocks-access. If main agent fixes /api/clients (adds require_perm('crm')), the test_edit_permissions_persist test will pass. Frontend App.js fix (PermGuard + Team imports) is already applied.",
+  "rca of the issue": "1) /api/clients bypass: `list_clients` handler declared as `Depends(get_current_user)` instead of `Depends(require_perm('crm'))` — likely copy-paste oversight during RBAC gating pass; all other /clients handlers use require_perm. 2) App.js crash: routes were added referring to PermGuard/Team components but corresponding import statements were never added; caused ReferenceError at first render of any admin route."
+}
