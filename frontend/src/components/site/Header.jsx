@@ -38,7 +38,7 @@ export function Header() {
       <div className="max-w-7xl mx-auto px-6 lg:px-12 h-20 flex items-center justify-between">
         <Link to="/" data-testid="logo-link" className="flex items-center gap-3">
           {settings.logo_url ? (
-            <img src={fileUrl(settings.logo_url)} alt="logo" className="h-9 w-auto object-contain" />
+            <img src={fileUrl(settings.logo_url)} alt="logo" className="h-12 w-auto object-contain" />
           ) : (
             <div className="h-9 w-9 border border-[#4A7C94] flex items-center justify-center">
               <span className="font-display text-[#4A7C94] text-lg leading-none">E</span>

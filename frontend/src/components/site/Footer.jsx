@@ -44,19 +44,19 @@ export function Footer() {
         </div>
       </div>
       <div className="border-t border-[#27272A] py-6">
-        <div className="max-w-7xl mx-auto px-6 lg:px-12 text-xs text-[#71717A] flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <span>© {new Date().getFullYear()} {s.company_name || "Executive Distribution"}. All rights reserved.</span>
-          <div className="flex items-center gap-6">
-            <span className="hidden md:inline">{s.footer_text}</span>
+        <div className="max-w-7xl mx-auto px-6 lg:px-12 text-xs text-[#71717A] grid grid-cols-1 md:grid-cols-3 items-center gap-4">
+          <span className="text-center md:text-left order-2 md:order-1">© {new Date().getFullYear()} {s.company_name || "Executive Distribution"}. All rights reserved.</span>
+          <div className="flex justify-center order-1 md:order-2">
             <Link to="/login" data-testid="footer-admin-logo" aria-label="Admin portal"
-              className="group flex items-center justify-center h-9 w-9 rounded-sm border border-[#27272A] hover:border-[#4A7C94] transition-colors overflow-hidden opacity-60 hover:opacity-100">
+              className="group flex items-center justify-center h-14 w-14 rounded-sm hover:bg-[#121214] transition-colors overflow-hidden opacity-80 hover:opacity-100">
               {s.logo_url ? (
                 <img src={fileUrl(s.logo_url)} alt="admin" className="max-h-full max-w-full object-contain" />
               ) : (
-                <span className="font-display text-[#4A7C94] text-sm leading-none">E</span>
+                <span className="font-display text-[#4A7C94] text-xl leading-none">E</span>
               )}
             </Link>
           </div>
+          <span className="text-center md:text-right order-3">{s.footer_text}</span>
         </div>
       </div>
     </footer>

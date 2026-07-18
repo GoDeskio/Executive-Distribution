@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 7 features verified end-to-end. Backend: 5/5 new pytest cases pass (portal approve, expiry, notifications, share toggle, mark-read). Frontend UI: portal Approve button works unauthenticated, admin Recent Activity shows the approval, notif badge behavior verified, per-doc share toggle round-trips, client-status is now shadcn Select, portal-expiry offers Never/7/30/90d, header logo h-12 (34x48px), footer-admin-logo centered at x=960/1920 and links to /login.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "CRM Edit Client - portal-expiry", "issues": ["portal-expiry is still a native <select> (not shadcn). Requirement only mandated shadcn for Status; expiry native is functional but visually inconsistent with the new shadcn Status Select in the same modal."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter7_features.py",
+    "/app/backend/tests/test_client_portal.py",
+    "/app/test_reports/pytest/iter7_results.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: convert portal-expiry to shadcn Select for visual consistency with client-status.",
+    "OPTIONAL (carried from iter6): wrap navigator.clipboard.writeText for copy-portal in try/catch."
+  ],
+  "critical_code_review_comments": [
+    "POST /api/portal/{token}/approve is correctly public (no auth dep) and validates portal_expires_at via _portal_expired().",
+    "Portal document listing filter uses shared: {'$ne': False} so legacy docs without the field remain visible — correct behavior.",
+    "toggle_share endpoint casts payload.get('shared', True) to bool safely.",
+    "Notifications mark_read updates ALL unread (global). If multi-admin is added later, consider scoping notifications per user.",
+    "Portal expiry stored as ISO string; _portal_expired parses and compares against utcnow — OK."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter7_features.py"],
+  "success_rate": {"backend": "100% (5/5 new + 7/7 legacy portal tests)", "frontend": "100% (all iter7 flows verified)"},
+  "test_credentials": "admin@executivedistribution.com / Executive2025!",
+  "seed_data_creation": "test_iter7_features.py creates and cleans up its own TEST_Iter7_* client + quote doc. Post-run TEST_Iter7 clients were also deleted manually. Existing 'TEST_UI Client' quote EXD-Q-00003 was flipped to 'approved' during UI verification (visible on Dashboard Recent Activity and Documents table).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "New pytest file at /app/backend/tests/test_iter7_features.py covers portal approve + notifications + share toggle + expiry. Testids: portal-approve-{i} on public portal, share-{docId} on Documents table (title text toggles between 'Shared to portal — click to hide' and 'Hidden from portal — click to share'), notif-bell + notif-badge in AdminLayout, client-status (shadcn combobox), portal-expiry (native select with values Never/7/30/90). Public portal must be opened in a fresh browser context WITHOUT ed_token. GET /api/portal/{token} filters docs with pdf_file_id present AND shared!==false.",
+  "rca of the issue": "N/A - no blocking issues."
+}
