@@ -12,18 +12,22 @@ export default function Settings() {
   const [uploading, setUploading] = useState(false);
   const [ownKey, setOwnKey] = useState("");
   const [emailKey, setEmailKey] = useState("");
+  const [slackHook, setSlackHook] = useState("");
+  const [stytchSecret, setStytchSecret] = useState("");
 
   useEffect(() => { api.get("/settings").then((r) => setS(r.data)).catch(() => {}); }, []);
 
   const save = async () => {
     setBusy(true);
     try {
-      const { seo_title, seo_description, seo_keywords, has_own_key, has_email_key, ...rest } = s;
+      const { seo_title, seo_description, seo_keywords, has_own_key, has_email_key, has_slack_webhook, has_stytch_secret, ...rest } = s;
       const payload = { ...rest };
       if (ownKey.trim()) payload.ai_own_key = ownKey.trim();
       if (emailKey.trim()) payload.email_api_key = emailKey.trim();
+      if (slackHook.trim()) payload.slack_webhook_url = slackHook.trim();
+      if (stytchSecret.trim()) payload.stytch_secret = stytchSecret.trim();
       await api.put("/settings", payload);
-      setOwnKey(""); setEmailKey("");
+      setOwnKey(""); setEmailKey(""); setSlackHook(""); setStytchSecret("");
       toast.success("Settings saved");
     }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
@@ -144,6 +148,38 @@ export default function Settings() {
               <p className="text-xs text-[#71717A] mt-2">Stored securely and never exposed by the API. One-click email delivery can be enabled in a future update.</p>
             </div>
           )}
+
+          <div className="border-t border-[#27272A] pt-5">
+            <div className="text-sm font-medium mb-1">Slack Approval Alerts</div>
+            <p className="text-xs text-[#71717A] mb-3">Get pinged in Slack the instant a client approves a quote from their portal.</p>
+            <label className="label-caps block mb-2">Slack Incoming Webhook URL {s.has_slack_webhook && <span className="text-xs text-emerald-400">(connected)</span>}</label>
+            <input data-testid="slack-webhook" type="password" value={slackHook} onChange={(e) => setSlackHook(e.target.value)} className={inp}
+              placeholder={s.has_slack_webhook ? "•••••••• (leave blank to keep current)" : "https://hooks.slack.com/services/…"} />
+            <label className="flex items-center gap-2 text-sm mt-3">
+              <input type="checkbox" data-testid="alert-on-approval" checked={!!s.alert_on_approval} onChange={(e) => setS({ ...s, alert_on_approval: e.target.checked })} className="accent-[#4A7C94]" />
+              Send an alert when a client approves a quote
+            </label>
+          </div>
+
+          <div className="border-t border-[#27272A] pt-5">
+            <div className="text-sm font-medium mb-1">Social Login — Stytch</div>
+            <p className="text-xs text-[#71717A] mb-3">Connect Stytch to offer social / passwordless login. Saved for later — social login activation is coming soon.</p>
+            <label className="flex items-center gap-2 text-sm mb-3">
+              <input type="checkbox" data-testid="social-login-enabled" checked={!!s.social_login_enabled} onChange={(e) => setS({ ...s, social_login_enabled: e.target.checked })} className="accent-[#4A7C94]" />
+              Enable social login (when available)
+            </label>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="label-caps block mb-2">Stytch Project ID</label>
+                <input data-testid="stytch-project" value={s.stytch_project_id || ""} onChange={(e) => setS({ ...s, stytch_project_id: e.target.value })} className={inp} placeholder="project-live-…" />
+              </div>
+              <div>
+                <label className="label-caps block mb-2">Stytch Secret {s.has_stytch_secret && <span className="text-xs text-emerald-400">(on file)</span>}</label>
+                <input data-testid="stytch-secret" type="password" value={stytchSecret} onChange={(e) => setStytchSecret(e.target.value)} className={inp}
+                  placeholder={s.has_stytch_secret ? "•••••••• (leave blank to keep)" : "secret-live-…"} />
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="bg-[#121214] border border-[#27272A] rounded-md p-6 space-y-5">

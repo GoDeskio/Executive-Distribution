@@ -273,6 +273,10 @@ async def get_settings():
     doc["has_own_key"] = bool(own)
     email_key = (doc.pop("email_api_key", "") or "").strip()
     doc["has_email_key"] = bool(email_key)
+    slack = (doc.pop("slack_webhook_url", "") or "").strip()
+    doc["has_slack_webhook"] = bool(slack)
+    stytch = (doc.pop("stytch_secret", "") or "").strip()
+    doc["has_stytch_secret"] = bool(stytch)
     return doc
 
 
@@ -281,6 +285,8 @@ async def update_settings(payload: dict, user: dict = Depends(get_current_user))
     payload.pop("_id", None)
     payload.pop("has_own_key", None)
     payload.pop("has_email_key", None)
+    payload.pop("has_slack_webhook", None)
+    payload.pop("has_stytch_secret", None)
     await db.settings.update_one({"_id": "site"}, {"$set": payload}, upsert=True)
     doc = await db.settings.find_one({"_id": "site"})
     doc.pop("_id", None)
@@ -288,6 +294,10 @@ async def update_settings(payload: dict, user: dict = Depends(get_current_user))
     doc["has_own_key"] = bool(own)
     email_key = (doc.pop("email_api_key", "") or "").strip()
     doc["has_email_key"] = bool(email_key)
+    slack = (doc.pop("slack_webhook_url", "") or "").strip()
+    doc["has_slack_webhook"] = bool(slack)
+    stytch = (doc.pop("stytch_secret", "") or "").strip()
+    doc["has_stytch_secret"] = bool(stytch)
     return doc
 
 
@@ -386,6 +396,20 @@ class PortalApproveInput(BaseModel):
     document_id: str
 
 
+def _send_approval_alerts(settings: dict, client_name: str, doc_number: str, amount):
+    """Best-effort Slack alert when a client approves a quote."""
+    if not settings.get("alert_on_approval"):
+        return
+    webhook = (settings.get("slack_webhook_url") or "").strip()
+    if webhook.startswith("http"):
+        try:
+            text = (f":white_check_mark: *Quote approved* — {client_name} approved "
+                    f"{doc_number} (${float(amount or 0):,.2f}) on the client portal.")
+            requests.post(webhook, json={"text": text}, timeout=8)
+        except Exception as e:
+            logger.warning(f"Slack alert failed: {e}")
+
+
 @api_router.post("/portal/{token}/approve")
 async def portal_approve(token: str, data: PortalApproveInput):
     client = await db.clients.find_one({"portal_token": token})
@@ -400,6 +424,8 @@ async def portal_approve(token: str, data: PortalApproveInput):
         "document_number": doc.get("number", ""), "document_id": str(doc["_id"]),
         "read": False, "created_at": now_iso(),
     })
+    settings = await _get_settings_doc()
+    _send_approval_alerts(settings, client.get("name", ""), doc.get("number", ""), doc.get("grand_total", 0))
     return {"ok": True, "status": "approved"}
 
 
@@ -1100,6 +1126,11 @@ DEFAULT_SETTINGS = {
     "email_provider": "none",
     "email_api_key": "",
     "email_from": "",
+    "slack_webhook_url": "",
+    "alert_on_approval": False,
+    "social_login_enabled": False,
+    "stytch_project_id": "",
+    "stytch_secret": "",
 }
 
 

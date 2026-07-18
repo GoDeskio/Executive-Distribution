@@ -1,0 +1,23 @@
+{
+  "summary": "Iter 8: Validated new Settings → Integrations blocks (Slack webhook + alert-on-approval, Stytch social login connect). Backend pytest 5/5 passed; UI persistence + secret sanitization verified via Playwright; end-to-end quote approval works with a fake Slack webhook enabled (Slack POST fails silently, approval still 200, admin notification created).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter8_integrations.py",
+    "/app/test_reports/pytest/iter8.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py already ~1200 lines — consider splitting settings/portal/documents into routers.",
+    "_send_approval_alerts uses blocking `requests.post` with 8s timeout inside an async endpoint; ok as best-effort, but under load could block the event loop briefly. Consider `asyncio.to_thread` or httpx.AsyncClient.",
+    "GET /api/settings is unauthenticated (needed for public portal to fetch branding) but currently returns full non-secret settings including flags like alert_on_approval/social_login_enabled and stytch_project_id. Not sensitive, but consider a narrower /api/settings/public projection."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter8_integrations.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin@executivedistribution.com / Executive2025!",
+  "seed_data_creation": "Created & cleaned up TEST_IT8 client + quote and TEST_IT8_B client + quote. Reset Slack/Stytch fields to blank / disabled at end.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend GET/PUT /api/settings correctly hide slack_webhook_url and stytch_secret (also ai_own_key, email_api_key), exposing only has_slack_webhook and has_stytch_secret booleans. Portal approve endpoint /api/portal/{token}/approve is unauthenticated and calls _send_approval_alerts best-effort; a fake Slack webhook does NOT break approval (verified: 200 in <15s, notification row inserted). Frontend Settings.jsx sends secret fields only when typed; placeholders switch to 'leave blank to keep' when has_* is true.",
+  "rca of the issue": "N/A — no defects found. First UI run showed values not persisting after reload; root cause was insufficient wait between save click and reload (PUT not yet completed). Rerun with 2.5s wait confirmed everything persists correctly."
+}
