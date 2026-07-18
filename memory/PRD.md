@@ -16,6 +16,9 @@ Build a fully dynamic, professional website "Executive Distribution" (Import/Exp
 - Design: `/app/design_guidelines.json` (Playfair Display + Manrope, obsidian + steel blue).
 
 ## Implemented (2026-06)
+- **Backend modularized (2026-06):** Split the ~1400-line `server.py` into `core/` (db, config, utils, security, settings_store) + `routers/` (auth, users, services, settings, clients, portal, notifications, quotes, files, analytics, chat, documents, search). `server.py` is now an 87-line assembly file. Verified byte-behavior-identical: 28/28 regression tests + RBAC suites pass, no drift.
+- **Production reverse proxy + SEO rewrites (2026-06):** Added `deploy/nginx.conf` (single-origin proxy that rewrites `/sitemap.xml`→`/api/sitemap.xml` and `/robots.txt`→`/api/robots.txt`), an optional commented `proxy` service in `docker-compose.yml`, and a new DEPLOYMENT.md section 6.
+- **Larimar card image (2026-06):** Homepage "Larimar & Mineral Supply" service now uses the user-uploaded Larimar1.webp image.
 - **Per-page SEO + sitemap.xml/robots.txt (2026-06):** Admin → SEO Controls now has a canonical Site URL, per-page meta overrides (path/title/description/keywords, add/remove), and one-click links to `/api/sitemap.xml` (auto-built from published services + overrides) and `/api/robots.txt`. NOTE: served under `/api/*` due to ingress; in production add a rewrite from `/sitemap.xml`→`/api/sitemap.xml` and `/robots.txt`→`/api/robots.txt`.
 - **Client-linked documents (2026-06):** Documents already carry `client_id`; added `GET /api/clients/{id}/documents` (crm perm) and a Documents list inside the client edit modal (number, type, date, total, status + PDF download).
 - **Brute-force login lockout (2026-06):** After N failed attempts an account locks for M minutes (HTTP 429). Configurable by admin in Settings → Login Security (defaults 5 attempts / 15 min). Counters reset on success. Verified via curl (3/1-min config → lock → 429 on correct password).

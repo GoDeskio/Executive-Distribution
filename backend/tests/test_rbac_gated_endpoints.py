@@ -170,14 +170,22 @@ class TestSuperadminBasics:
 class TestSuperadminHitsGatedEndpoints:
     """Superadmin bypasses require_perm regardless of permissions list."""
 
-    def test_super_put_quote(self, super_token, throwaway_ids):
-        r = requests.put(
-            f"{API}/quotes/{throwaway_ids['quote']}",
-            headers=_h(super_token),
-            json={"status": "in_review", "notes": "checked"},
-        )
-        assert r.status_code == 200, r.text
-        assert r.json().get("status") == "in_review"
+    def test_super_put_quote(self, super_token):
+        # Create an isolated quote for this test to avoid xdist ordering races
+        # with the shared throwaway quote (which other tests may delete).
+        cr = requests.post(f"{API}/quotes", data={"name": "PUT-ISO", "email": "put-iso@exd.com"})
+        assert cr.status_code == 200, cr.text
+        qid = cr.json()["id"]
+        try:
+            r = requests.put(
+                f"{API}/quotes/{qid}",
+                headers=_h(super_token),
+                json={"status": "in_review", "notes": "checked"},
+            )
+            assert r.status_code == 200, r.text
+            assert r.json().get("status") == "in_review"
+        finally:
+            requests.delete(f"{API}/quotes/{qid}", headers=_h(super_token))
 
     def test_super_list_files(self, super_token):
         r = requests.get(f"{API}/files", headers=_h(super_token))
