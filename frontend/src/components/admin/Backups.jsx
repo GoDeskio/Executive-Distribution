@@ -28,11 +28,15 @@ export function Backups() {
   const saveConfig = async () => {
     setBusy("cfg");
     try {
-      await api.put("/settings", {
+      const payload = {
         backup_dir: cfg.backup_dir || "",
         backup_include_files: !!cfg.backup_include_files,
         backup_auto_before_update: !!cfg.backup_auto_before_update,
-      });
+        backup_schedule_enabled: !!cfg.backup_schedule_enabled,
+        backup_schedule_interval_hours: Math.max(1, parseInt(cfg.backup_schedule_interval_hours) || 24),
+        backup_retention: Math.max(1, parseInt(cfg.backup_retention) || 7),
+      };
+      await api.put("/settings", payload);
       toast.success("Backup settings saved");
       await load();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
@@ -109,6 +113,29 @@ export function Backups() {
           <input type="checkbox" data-testid="backup-auto" checked={!!cfg.backup_auto_before_update} onChange={(e) => setCfg({ ...cfg, backup_auto_before_update: e.target.checked })} className="accent-[#4A7C94]" />
           Auto-backup right before applying an update
         </label>
+      </div>
+
+      {/* Scheduled backups */}
+      <div className="border-t border-[#27272A] pt-5 space-y-4">
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" data-testid="backup-schedule-enabled" checked={!!cfg.backup_schedule_enabled} onChange={(e) => setCfg({ ...cfg, backup_schedule_enabled: e.target.checked })} className="accent-[#4A7C94]" />
+          Automatic scheduled backups to the server folder
+        </label>
+        <div className="grid grid-cols-2 gap-4 max-w-md">
+          <div>
+            <label className="label-caps block mb-2">Every (hours)</label>
+            <input data-testid="backup-interval" type="number" min={1} value={cfg.backup_schedule_interval_hours ?? 24}
+              onChange={(e) => setCfg({ ...cfg, backup_schedule_interval_hours: e.target.value })} className={inp} />
+          </div>
+          <div>
+            <label className="label-caps block mb-2">Keep last (backups)</label>
+            <input data-testid="backup-retention" type="number" min={1} value={cfg.backup_retention ?? 7}
+              onChange={(e) => setCfg({ ...cfg, backup_retention: e.target.value })} className={inp} />
+          </div>
+        </div>
+        {cfg.backup_last_scheduled_at && (
+          <p className="text-xs text-[#71717A]">Last scheduled backup: {new Date(cfg.backup_last_scheduled_at).toLocaleString()}</p>
+        )}
       </div>
 
       {/* Actions */}

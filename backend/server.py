@@ -76,6 +76,7 @@ async def startup():
         logger.error(f"Storage init failed: {e}")
 
     app.state.update_poller = asyncio.create_task(_update_poller())
+    app.state.backup_poller = asyncio.create_task(_backup_poller())
 
 
 # Interval between automatic update checks (seconds). Default: 24h.
@@ -103,11 +104,42 @@ async def _update_poller():
         await asyncio.sleep(UPDATE_CHECK_INTERVAL)
 
 
+async def _backup_poller():
+    """Scheduled automatic backups to the server folder, pruned to the retention count."""
+    await asyncio.sleep(120)
+    while True:
+        interval_hours = 24
+        try:
+            s = await get_settings_doc()
+            interval_hours = int(s.get("backup_schedule_interval_hours", 24) or 24)
+            if s.get("backup_schedule_enabled"):
+                last = s.get("backup_last_scheduled_at")
+                due = True
+                if last:
+                    try:
+                        from datetime import datetime, timezone
+                        due = (datetime.now(timezone.utc) - datetime.fromisoformat(last)).total_seconds() >= interval_hours * 3600 - 60
+                    except Exception:
+                        due = True
+                if due:
+                    from core.backup import save_backup_to_disk, prune_disk_backups
+                    info = await save_backup_to_disk(s, bool(s.get("backup_include_files", True)))
+                    removed = prune_disk_backups(s, s.get("backup_retention", 7))
+                    await db.settings.update_one({"_id": "site"},
+                                                 {"$set": {"backup_last_scheduled_at": now_iso(),
+                                                           "backup_last_scheduled_file": info.get("filename")}})
+                    logger.info(f"scheduled backup saved: {info.get('filename')} (pruned {len(removed)})")
+        except Exception as e:
+            logger.warning(f"backup poller error: {e}")
+        await asyncio.sleep(max(1, min(interval_hours, 24)) * 3600)
+
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    task = getattr(app.state, "update_poller", None)
-    if task:
-        task.cancel()
+    for attr in ("update_poller", "backup_poller"):
+        task = getattr(app.state, attr, None)
+        if task:
+            task.cancel()
     client.close()
 
 

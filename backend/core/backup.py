@@ -100,6 +100,23 @@ def delete_disk_backup(settings: dict, filename: str) -> bool:
     return False
 
 
+def prune_disk_backups(settings: dict, keep: int) -> list:
+    """Keeps the newest `keep` backups in the folder; deletes older ones. Returns removed names."""
+    keep = max(int(keep or 1), 1)
+    dir_path = Path(resolve_backup_dir(settings))
+    if not dir_path.exists():
+        return []
+    files = sorted(dir_path.glob("exd-backup-*.zip"), key=lambda f: f.stat().st_mtime, reverse=True)
+    removed = []
+    for f in files[keep:]:
+        try:
+            f.unlink()
+            removed.append(f.name)
+        except Exception as e:
+            logger.warning(f"prune: could not delete {f.name}: {e}")
+    return removed
+
+
 async def restore_backup(zip_bytes: bytes) -> dict:
     """DESTRUCTIVE but safe: snapshots current data first and rolls back on any failure."""
     buf = io.BytesIO(zip_bytes)

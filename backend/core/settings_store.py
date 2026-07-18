@@ -126,4 +126,7 @@ DEFAULT_SETTINGS = {
     "backup_dir": "",
     "backup_include_files": True,
     "backup_auto_before_update": True,
+    "backup_schedule_enabled": False,
+    "backup_schedule_interval_hours": 24,
+    "backup_retention": 7,
 }
