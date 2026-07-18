@@ -16,6 +16,7 @@ Build a fully dynamic, professional website "Executive Distribution" (Import/Exp
 - Design: `/app/design_guidelines.json` (Playfair Display + Manrope, obsidian + steel blue).
 
 ## Implemented (2026-06)
+- **AI Auto-Draft Quote:** admin describes a shipment in plain English → AI extracts line items + required documents; backend computes fees/customs/tax from Fee Calculator rules; draft opens pre-filled in the quote editor → save → one-click watermarked PDF. (`POST /api/documents/ai-draft`)
 - Public site: Hero, stats, dynamic services grid, dynamic service detail pages, about, contact.
 - **AI Assistant (pluggable):** OpenAI/Anthropic/Gemini via emergentintegrations. Default Emergent key + admin BYO key in Settings. Public floating chat concierge (fees/docs/services + guides to quote form) and admin ops assistant (streaming).
 - **Fee/customs calculator:** rule-based numbers (`/api/calculate`, rates editable in Settings) + AI explains required documents.

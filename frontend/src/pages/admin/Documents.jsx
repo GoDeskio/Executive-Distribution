@@ -94,6 +94,7 @@ function Builder() {
       });
       const draft = {
         ...EMPTY, ...data,
+        client_name: data.client_name || c?.name || "Prospect",
         client_company: c?.company || "", client_email: c?.email || "", client_phone: c?.phone || "",
         line_items: data.line_items?.length ? data.line_items : [{ ...emptyLine }],
       };
