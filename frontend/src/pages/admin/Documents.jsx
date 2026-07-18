@@ -5,7 +5,7 @@ import api, { fileUrl, formatApiError } from "@/lib/api";
 import { AdminHeader } from "./AdminHeader";
 
 const inp = "w-full bg-[#0A0A0B] border border-[#27272A] focus:border-[#4A7C94] outline-none rounded-sm px-3 py-2.5 text-sm transition-colors";
-const emptyLine = { item: "", qty: 1, unit_price: 0, fees: 0, customs: 0, total: 0 };
+const emptyLine = { item: "", hs_code: "", qty: 1, unit_price: 0, fees: 0, customs: 0, total: 0 };
 const EMPTY = {
   doc_type: "quote", client_id: "", client_name: "", client_company: "", client_email: "", client_phone: "",
   destination: "", port: "", po_number: "", tracking_number: "", date: "", line_items: [{ ...emptyLine }],
@@ -40,6 +40,8 @@ function Builder() {
   const [editing, setEditing] = useState(null);
   const [ai, setAi] = useState(null); // { desc, client_id }
   const [aiBusy, setAiBusy] = useState(false);
+  const [refine, setRefine] = useState("");
+  const [refineBusy, setRefineBusy] = useState(false);
 
   const load = () => api.get("/documents").then((r) => setDocs(r.data)).catch(() => {});
   useEffect(() => { load(); api.get("/clients").then((r) => setClients(r.data)).catch(() => {}); }, []);
@@ -108,6 +110,31 @@ function Builder() {
 
   const t = editing ? totals(editing.line_items, editing.tax_total) : null;
 
+  const runRefine = async () => {
+    if (!refine.trim()) return toast.error("Type a refinement instruction");
+    setRefineBusy(true);
+    const current = editing.line_items.filter((l) => l.item)
+      .map((l) => `${l.qty} x ${l.item}${l.hs_code ? ` (HS ${l.hs_code})` : ""} @ $${l.unit_price}`).join("; ");
+    const desc = `Existing ${editing.doc_type} for ${editing.client_name || "client"} shipping to ${editing.destination || "destination"}${editing.port ? ` via ${editing.port}` : ""}. Current line items: ${current || "none yet"}. Apply this change and return the FULL updated quote: ${refine}`;
+    try {
+      const { data } = await api.post("/documents/ai-draft", {
+        description: desc, doc_type: editing.doc_type,
+        client_id: editing.client_id || "", client_name: editing.client_name || "",
+      });
+      setEditing((p) => ({
+        ...p,
+        destination: data.destination || p.destination,
+        port: data.port || p.port,
+        notes: data.notes || p.notes,
+        tax_total: data.tax_total ?? p.tax_total,
+        line_items: data.line_items?.length ? data.line_items : p.line_items,
+      }));
+      setRefine("");
+      toast.success("Quote regenerated");
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Refine failed"); }
+    finally { setRefineBusy(false); }
+  };
+
   return (
     <div>
       <div className="flex justify-end gap-2 mb-4">
@@ -135,8 +162,11 @@ function Builder() {
                 <td className="px-6 py-4"><span className={`text-xs px-2 py-1 rounded-sm ${d.status === "generated" ? "text-emerald-300 bg-emerald-950/40" : "text-[#A1A1AA] bg-[#1A1A1D]"}`}>{d.status}</span></td>
                 <td className="px-6 py-4 text-[#71717A] text-xs">{d.date}</td>
                 <td className="px-6 py-4 text-right whitespace-nowrap">
+                  {d.pdf_file_id && (
+                    <a data-testid={`row-download-${d.id}`} href={fileUrl(`/api/files/${d.pdf_file_id}/raw`)} target="_blank" rel="noreferrer" title="Download PDF" className="inline-block text-emerald-400 hover:text-white p-1 mr-1"><Download size={15} /></a>
+                  )}
                   <button data-testid={`generate-${d.id}`} onClick={() => generate(d.id)} title="Generate PDF" className="text-[#4A7C94] hover:text-white p-1 mr-1"><Wand2 size={15} /></button>
-                  <button onClick={() => setEditing({ ...EMPTY, ...d, line_items: d.line_items?.length ? d.line_items : [{ ...emptyLine }] })} title="Edit" className="text-[#71717A] hover:text-white p-1 mr-1"><FileCheck size={15} /></button>
+                  <button onClick={() => { setRefine(""); setEditing({ ...EMPTY, ...d, line_items: d.line_items?.length ? d.line_items : [{ ...emptyLine }] }); }} title="Edit" className="text-[#71717A] hover:text-white p-1 mr-1"><FileCheck size={15} /></button>
                   <button onClick={() => remove(d.id)} className="text-[#71717A] hover:text-red-400 p-1"><Trash2 size={15} /></button>
                 </td>
               </tr>
@@ -209,11 +239,16 @@ function Builder() {
                   <label className="label-caps">Line Items</label>
                   <button data-testid="add-line" onClick={() => setEditing({ ...editing, line_items: [...editing.line_items, { ...emptyLine }] })} className="text-xs text-[#4A7C94] hover:text-white flex items-center gap-1"><Plus size={13} /> Add line</button>
                 </div>
+                <div className="grid grid-cols-12 gap-2 mb-2 px-1 text-[10px] uppercase tracking-wide text-[#71717A]">
+                  <span className="col-span-3">Item</span><span className="col-span-2">HS Code</span><span className="col-span-1">Qty</span>
+                  <span className="col-span-2">Unit $</span><span className="col-span-1">Fees</span><span className="col-span-2">Customs</span><span className="col-span-1"></span>
+                </div>
                 <div className="space-y-2">
                   {editing.line_items.map((li, i) => (
                     <div key={i} className="grid grid-cols-12 gap-2 items-center">
-                      <input placeholder="Item" data-testid={`line-item-${i}`} value={li.item} onChange={(e) => { const l = [...editing.line_items]; l[i] = { ...l[i], item: e.target.value }; setEditing({ ...editing, line_items: l }); }} className={inp + " col-span-4"} />
-                      <input type="number" placeholder="Qty" value={li.qty} onChange={(e) => { const l = [...editing.line_items]; l[i] = { ...l[i], qty: e.target.value }; setEditing({ ...editing, line_items: l }); }} className={inp + " col-span-2"} />
+                      <input placeholder="Item" data-testid={`line-item-${i}`} value={li.item} onChange={(e) => { const l = [...editing.line_items]; l[i] = { ...l[i], item: e.target.value }; setEditing({ ...editing, line_items: l }); }} className={inp + " col-span-3"} />
+                      <input placeholder="HS" data-testid={`line-hs-${i}`} value={li.hs_code || ""} onChange={(e) => { const l = [...editing.line_items]; l[i] = { ...l[i], hs_code: e.target.value }; setEditing({ ...editing, line_items: l }); }} className={inp + " col-span-2"} />
+                      <input type="number" placeholder="Qty" value={li.qty} onChange={(e) => { const l = [...editing.line_items]; l[i] = { ...l[i], qty: e.target.value }; setEditing({ ...editing, line_items: l }); }} className={inp + " col-span-1"} />
                       <input type="number" placeholder="Unit $" value={li.unit_price} onChange={(e) => { const l = [...editing.line_items]; l[i] = { ...l[i], unit_price: e.target.value }; setEditing({ ...editing, line_items: l }); }} className={inp + " col-span-2"} />
                       <input type="number" placeholder="Fees" value={li.fees} onChange={(e) => { const l = [...editing.line_items]; l[i] = { ...l[i], fees: e.target.value }; setEditing({ ...editing, line_items: l }); }} className={inp + " col-span-1"} />
                       <input type="number" placeholder="Customs" value={li.customs} onChange={(e) => { const l = [...editing.line_items]; l[i] = { ...l[i], customs: e.target.value }; setEditing({ ...editing, line_items: l }); }} className={inp + " col-span-2"} />
@@ -221,6 +256,17 @@ function Builder() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div className="bg-[#0A0A0B] border border-[#27272A] rounded-sm p-4 flex items-center gap-2">
+                <Sparkles size={15} className="text-[#4A7C94] shrink-0" />
+                <input data-testid="refine-input" value={refine} onChange={(e) => setRefine(e.target.value)}
+                  placeholder="Refine with AI — e.g. add insurance, change destination to Rotterdam, add 20 pallets of coffee"
+                  className="flex-1 bg-transparent outline-none text-sm placeholder:text-[#52525B]" />
+                <button data-testid="refine-btn" onClick={runRefine} disabled={refineBusy}
+                  className="text-xs bg-[#4A7C94] hover:bg-[#5A8CA4] disabled:opacity-60 text-white px-3 py-2 rounded-sm transition-colors whitespace-nowrap">
+                  {refineBusy ? "Regenerating…" : "Regenerate"}
+                </button>
               </div>
 
               <div className="grid grid-cols-2 gap-6">

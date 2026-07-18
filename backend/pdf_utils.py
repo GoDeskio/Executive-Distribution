@@ -114,8 +114,11 @@ def generate_document_pdf(doc: dict, settings: dict, logo_bytes: bytes = None) -
     # line items
     data = [["Item / Description", "Qty", "Unit Price", "Fees", "Customs", "Amount"]]
     for li in doc.get("line_items", []):
+        item_text = li.get("item", "")
+        if li.get("hs_code"):
+            item_text += f'<br/><font size="7" color="#71717A">HS {li["hs_code"]}</font>'
         data.append([
-            Paragraph(li.get("item", ""), normal),
+            Paragraph(item_text, normal),
             str(li.get("qty", 1)),
             f'${float(li.get("unit_price", 0)):,.2f}',
             f'${float(li.get("fees", 0)):,.2f}',

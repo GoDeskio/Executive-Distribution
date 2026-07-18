@@ -11,17 +11,19 @@ export default function Settings() {
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [ownKey, setOwnKey] = useState("");
+  const [emailKey, setEmailKey] = useState("");
 
   useEffect(() => { api.get("/settings").then((r) => setS(r.data)).catch(() => {}); }, []);
 
   const save = async () => {
     setBusy(true);
     try {
-      const { seo_title, seo_description, seo_keywords, has_own_key, ...rest } = s;
+      const { seo_title, seo_description, seo_keywords, has_own_key, has_email_key, ...rest } = s;
       const payload = { ...rest };
       if (ownKey.trim()) payload.ai_own_key = ownKey.trim();
+      if (emailKey.trim()) payload.email_api_key = emailKey.trim();
       await api.put("/settings", payload);
-      setOwnKey("");
+      setOwnKey(""); setEmailKey("");
       toast.success("Settings saved");
     }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
@@ -115,6 +117,33 @@ export default function Settings() {
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="bg-[#121214] border border-[#27272A] rounded-md p-6 space-y-5">
+          <div className="label-caps">Integrations</div>
+          <p className="text-xs text-[#71717A] -mt-2">Connect an email service to send documents to clients (saved for later — sending is not enabled yet).</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="label-caps block mb-2">Email Provider</label>
+              <select data-testid="email-provider" value={s.email_provider || "none"} onChange={(e) => setS({ ...s, email_provider: e.target.value })} className={inp}>
+                <option value="none">Not connected</option>
+                <option value="resend">Resend</option>
+                <option value="sendgrid">SendGrid</option>
+              </select>
+            </div>
+            <div>
+              <label className="label-caps block mb-2">From Email</label>
+              <input data-testid="email-from" value={s.email_from || ""} onChange={(e) => setS({ ...s, email_from: e.target.value })} className={inp} placeholder="docs@yourdomain.com" />
+            </div>
+          </div>
+          {s.email_provider && s.email_provider !== "none" && (
+            <div>
+              <label className="label-caps block mb-2">{s.email_provider === "resend" ? "Resend" : "SendGrid"} API Key {s.has_email_key && <span className="text-xs text-emerald-400">(key on file)</span>}</label>
+              <input data-testid="email-key" type="password" value={emailKey} onChange={(e) => setEmailKey(e.target.value)} className={inp}
+                placeholder={s.has_email_key ? "•••••••• (leave blank to keep current)" : "Paste your API key"} />
+              <p className="text-xs text-[#71717A] mt-2">Stored securely and never exposed by the API. One-click email delivery can be enabled in a future update.</p>
+            </div>
+          )}
         </div>
 
         <div className="bg-[#121214] border border-[#27272A] rounded-md p-6 space-y-5">

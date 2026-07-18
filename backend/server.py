@@ -271,6 +271,8 @@ async def get_settings():
     doc.pop("_id", None)
     own = (doc.pop("ai_own_key", "") or "").strip()
     doc["has_own_key"] = bool(own)
+    email_key = (doc.pop("email_api_key", "") or "").strip()
+    doc["has_email_key"] = bool(email_key)
     return doc
 
 
@@ -683,6 +685,7 @@ async def calculate(data: CalcInput):
 # ---------------------------------------------------------------------------
 class LineItem(BaseModel):
     item: str = ""
+    hs_code: str = ""
     qty: float = 1
     unit_price: float = 0
     fees: float = 0
@@ -744,7 +747,8 @@ async def ai_draft_document(data: AiDraftInput, user: dict = Depends(get_current
     prompt = (
         'Return ONLY valid JSON with this exact shape:\n'
         '{"destination": "", "port": "", "notes": "", "line_items": '
-        '[{"item": "", "qty": 1, "unit_price": 0, "weight_kg": 0, "declared_value": 0, "mode": "ocean"}]}\n'
+        '[{"item": "", "hs_code": "", "qty": 1, "unit_price": 0, "weight_kg": 0, "declared_value": 0, "mode": "ocean"}]}\n'
+        "- hs_code: the most likely 6-digit Harmonized System (HS) tariff code for the item (best estimate, digits only)\n"
         "- unit_price: estimated USD price per unit (0 if unknown)\n"
         "- declared_value: total customs value for the line in USD (qty*unit_price if unknown)\n"
         "- weight_kg: estimated total weight for the line in kg\n"
@@ -778,7 +782,8 @@ async def ai_draft_document(data: AiDraftInput, user: dict = Depends(get_current
         mode = li.get("mode", "ocean")
         fees_line, customs_line = _compute_line(declared, weight, qty, mode, rules)
         total = round(qty * unit_price + fees_line + customs_line, 2)
-        line_items.append({"item": li.get("item", ""), "qty": qty, "unit_price": round(unit_price, 2),
+        line_items.append({"item": li.get("item", ""), "hs_code": str(li.get("hs_code", "") or ""),
+                           "qty": qty, "unit_price": round(unit_price, 2),
                            "fees": fees_line, "customs": customs_line, "total": total})
         subtotal += qty * unit_price
         fees_sum += fees_line
@@ -975,6 +980,9 @@ DEFAULT_SETTINGS = {
         "vat_pct": 5.0,
         "port_surcharge": 120.0,
     },
+    "email_provider": "none",
+    "email_api_key": "",
+    "email_from": "",
 }
 
 
