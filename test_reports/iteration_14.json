@@ -1,0 +1,22 @@
+{
+  "summary": "Iteration 14: Backup & Restore backend tests — all 28 tests PASSED. Verified superadmin-only RBAC (401 unauth, 403 sub-admin with settings+seo) on all /api/backup/* endpoints; config shape; ZIP download w/ and w/o files (data.json + manifest.json + optional objects/); server save→list→download→delete round-trip; path traversal protection (encoded traversal and bad-prefix names return 404); full RESTORE round-trip (create client → download backup → delete client → restore → client recovered + superadmin login still works + client count preserved); empty and garbage-zip restore correctly return 400; regressions: super login, /api/audit superadmin-only, sub-admin without 'crm' gets 403 on /api/clients, sitemap.xml and robots.txt still valid.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter14_backup.py",
+    "/app/test_reports/pytest/iter14_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "core/backup.py restore_backup deletes then insert_many per collection — if insert_many fails mid-restore the DB is left partially wiped (no transaction). Consider staging to a temp DB or using bulk write with ordered=False + snapshot rollback for durability.",
+    "read_disk_backup / delete_disk_backup guard against '..' and '/' but not against backslashes or absolute paths on Windows; not exploitable on Linux hosting but worth normalizing via Path.resolve() and asserting parent == backup_dir.",
+    "DELETE /api/backup/server/{filename} returns 200 with ok:false for bad-prefix input — consistent but somewhat ambiguous vs 404. Consider unifying to 404 to match GET behavior."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter14_backup.py"],
+  "success_rate": {"backend": "100% (28/28)", "frontend": "not tested"},
+  "test_credentials": "admin@executivedistribution.com / Executive2025! (superadmin). Throwaway sub-admin created per test module with permissions=['settings','seo'] to prove backup endpoints stay 403 for non-superadmins; cleaned up in fixture teardown.",
+  "seed_data_creation": "TEST_sub_<hex>@example.com sub-admin (auto-deleted). BACKUP-RT-<hex> client created, deleted, restored via backup, then deleted again for cleanup. One temporary server backup created via /api/backup/save and deleted via /api/backup/server/{filename}.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Test file /app/backend/tests/test_iter14_backup.py is idempotent and self-cleans. Backup restore is DESTRUCTIVE — only restore backups you just created in-run so state returns to current. Sitemap/robots served at /api/sitemap.xml and /api/robots.txt on this deployment (fallback to non-/api also handled). Client-creation endpoint requires a real-looking email domain (example.com); .local/.test are rejected by Pydantic EmailStr."
+}

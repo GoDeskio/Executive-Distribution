@@ -117,6 +117,17 @@ async def run_update_script(settings: dict):
 
     async def _run():
         try:
+            # Safety net: snapshot data before touching code, if enabled.
+            if settings.get("backup_auto_before_update", True):
+                try:
+                    from core.backup import save_backup_to_disk
+                    info = await save_backup_to_disk(settings, bool(settings.get("backup_include_files", True)))
+                    logger.info(f"pre-update backup saved: {info.get('path')}")
+                    await db.settings.update_one({"_id": "site"},
+                                                 {"$set": {"update_last_backup": info.get("path"),
+                                                           "update_last_backup_at": now_iso()}})
+                except Exception as e:
+                    logger.warning(f"pre-update backup failed (continuing): {e}")
             proc = await asyncio.create_subprocess_exec(
                 "/bin/bash", script,
                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)

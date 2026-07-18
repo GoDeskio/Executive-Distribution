@@ -7,6 +7,7 @@ import api, { API } from "@/lib/api";
 import { AdminHeader } from "./AdminHeader";
 import { useAuth } from "@/context/AuthContext";
 import { SoftwareUpdates } from "@/components/admin/SoftwareUpdates";
+import { Backups } from "@/components/admin/Backups";
 
 function Stat({ icon: Icon, label, value, accent }) {
   return (
@@ -91,6 +92,7 @@ export default function Dashboard() {
         </div>
 
         {isSuper && <SoftwareUpdates />}
+        {isSuper && <Backups />}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 bg-[#121214] border border-[#27272A] rounded-md p-6">

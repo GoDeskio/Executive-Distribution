@@ -123,4 +123,7 @@ DEFAULT_SETTINGS = {
     "update_auto_check": True,
     "update_auto_apply": False,
     "update_current_version": "",
+    "backup_dir": "",
+    "backup_include_files": True,
+    "backup_auto_before_update": True,
 }
