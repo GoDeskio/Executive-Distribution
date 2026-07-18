@@ -1,0 +1,112 @@
+# Executive Distribution — Self-Hosting & Deployment Guide
+
+A full-stack import/export CRM + marketing site.
+
+- **Frontend:** React (CRA + craco), Tailwind, shadcn/ui
+- **Backend:** FastAPI + MongoDB (motor)
+- **AI:** pluggable — OpenAI / Anthropic / Google Gemini (bring your own key)
+- **Storage:** portable — local filesystem or Emergent object storage
+
+---
+
+## 1. Run locally with Docker (recommended)
+
+```bash
+# 1. Configure backend env
+cp backend/.env.example backend/.env
+#   -> edit JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD
+
+# 2. Start everything (MongoDB + API + web)
+docker compose up --build
+```
+
+- Web:      http://localhost:3000
+- API:      http://localhost:8001/api
+- Admin:    http://localhost:3000/login  (use ADMIN_EMAIL / ADMIN_PASSWORD)
+
+The admin user, default services and site settings are seeded automatically on
+first backend startup.
+
+> **Production frontend URL:** the API URL is baked into the React build.
+> Set `REACT_APP_BACKEND_URL` under `frontend.build.args` in `docker-compose.yml`
+> (or `frontend/.env`) to your public backend URL before building.
+
+---
+
+## 2. Run without Docker
+
+### Backend
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+pip install emergentintegrations --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/
+cp .env.example .env          # edit values; set MONGO_URL to your Mongo
+uvicorn server:app --host 0.0.0.0 --port 8001
+```
+
+### Frontend
+```bash
+cd frontend
+yarn install
+cp .env.example .env          # set REACT_APP_BACKEND_URL
+yarn build                    # production build in ./build
+npx serve -s build -l 3000    # or host ./build on any static host / CDN
+```
+
+You also need a MongoDB instance (local `mongod`, Docker, or MongoDB Atlas).
+
+---
+
+## 3. AI Assistant setup (important when self-hosting)
+
+The Emergent universal key (`EMERGENT_LLM_KEY`) only works **inside Emergent**.
+When self-hosting, connect your own provider key:
+
+1. Log in to the admin dashboard → **Settings → AI Assistant**
+2. Choose a **Provider** (OpenAI / Anthropic / Gemini) and **Model**
+3. Tick **“Use my own API key”** and paste your key → **Save**
+
+The key is stored server-side and never returned by the public API.
+Supported model examples: `gpt-5.4` (OpenAI), `claude-sonnet-4-6` (Anthropic),
+`gemini-3.1-pro-preview` (Gemini).
+
+---
+
+## 4. Storage
+
+Set in `backend/.env`:
+
+- `STORAGE_BACKEND=local` — files saved to `LOCAL_STORAGE_DIR` (mount a volume so
+  uploads persist). This is the default for self-hosting.
+- `STORAGE_BACKEND=emergent` — Emergent object storage (requires `EMERGENT_LLM_KEY`).
+
+Uploaded assets, client documents and generated PDFs all flow through the backend
+(`/api/files/{id}/raw`), so no external storage URLs are exposed.
+
+---
+
+## 5. Environment variables reference
+
+| Variable | Where | Purpose |
+|---|---|---|
+| `MONGO_URL` | backend | MongoDB connection string |
+| `DB_NAME` | backend | Database name |
+| `CORS_ORIGINS` | backend | Allowed origins (`*` or comma list) |
+| `JWT_SECRET` | backend | JWT signing secret (use a long random value) |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | backend | Seeded admin login |
+| `STORAGE_BACKEND` | backend | `local` or `emergent` |
+| `LOCAL_STORAGE_DIR` | backend | Where local files are written |
+| `EMERGENT_LLM_KEY` | backend | Only for Emergent hosting / storage |
+| `REACT_APP_BACKEND_URL` | frontend | Public API base URL (build-time) |
+
+---
+
+## 6. Security checklist before going live
+
+- [ ] Set a strong, unique `JWT_SECRET`
+- [ ] Change `ADMIN_PASSWORD` from the default
+- [ ] Restrict `CORS_ORIGINS` to your real domain(s)
+- [ ] Serve everything over HTTPS (put a reverse proxy / load balancer in front)
+- [ ] Add your own AI provider key via Settings
+- [ ] Back up MongoDB and the uploads volume

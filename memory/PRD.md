@@ -17,14 +17,17 @@ Build a fully dynamic, professional website "Executive Distribution" (Import/Exp
 
 ## Implemented (2026-06)
 - Public site: Hero, stats, dynamic services grid, dynamic service detail pages, about, contact.
-- **Request-a-Quote pipeline:** public form (name*, email*, company, phone, shipping destination, description, up to 4 reference images) → stored as quote-request cards in CRM. Admin can set status (new/reviewing/quoted/closed), delete, and convert a request into a Client.
-- Footer admin access is now a small company logo (bottom-right) linking to /login (editable from Settings).
-- Visitor tracking: pageview/click/scroll → visitors + events.
-- Auth: admin login, protected /admin, profile update + password change.
-- Admin dashboard: overview stats incl. New Requests, 14-day traffic chart, top pages, click heatmap.
-- Services: full CRUD + per-service SEO + image upload.
-- CRM: Quote Requests, Clients CRUD, Visitors list, Documents upload.
-- Object Storage: asset upload grid (logo lives here). SEO controls + Settings (all site content).
+- **AI Assistant (pluggable):** OpenAI/Anthropic/Gemini via emergentintegrations. Default Emergent key + admin BYO key in Settings. Public floating chat concierge (fees/docs/services + guides to quote form) and admin ops assistant (streaming).
+- **Fee/customs calculator:** rule-based numbers (`/api/calculate`, rates editable in Settings) + AI explains required documents.
+- **Quotes & Documents builder:** create quote/receipt/customs docs with line items + auto totals, auto number (EXD-Q-#####), generate watermarked (company logo) PDF → saved to "Send to Client" folder, downloadable.
+- **Global search:** clients, quote requests, documents by name/phone/email/date/port/quote no./PO no./tracking no./item.
+- Request-a-Quote pipeline (public form → CRM cards → convert to client).
+- Visitor tracking + heatmap; CRM (Requests, Clients, Visitors, Documents); Services CRUD + per-service SEO; Object Storage; SEO controls; Settings; Profile.
+- **Portability:** `storage.py` supports `STORAGE_BACKEND=local|emergent`; Dockerfiles, docker-compose.yml, .env.example files, and DEPLOYMENT.md for self-hosting outside Emergent.
+
+## Architecture (updated)
+- Backend modules: server.py (routes), ai.py (LLM), pdf_utils.py (PDF), storage.py (portable storage).
+- AI streams as raw text/plain; frontend reads body stream (lib/chat.js).
 
 ## Test Credentials
 admin@executivedistribution.com / Executive2025!
