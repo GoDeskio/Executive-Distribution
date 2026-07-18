@@ -419,7 +419,7 @@ async def update_settings(payload: dict, user: dict = Depends(require_any_perm("
 # CRM: Clients
 # ---------------------------------------------------------------------------
 @api_router.get("/clients")
-async def list_clients(user: dict = Depends(get_current_user)):
+async def list_clients(user: dict = Depends(require_perm("crm"))):
     docs = await db.clients.find({}).sort("created_at", -1).to_list(1000)
     return [clean(d) for d in docs]
 

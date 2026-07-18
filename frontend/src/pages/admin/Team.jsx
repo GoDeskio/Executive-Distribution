@@ -87,8 +87,8 @@ export default function Team() {
                     {u.role !== "superadmin" && (
                       <>
                         <button data-testid={`edit-user-${u.id}`} onClick={() => setEditing({ ...u, password: "" })} title="Edit access" className="text-[#71717A] hover:text-white p-1 mr-1"><UserCog size={15} /></button>
-                        <button onClick={() => setPwFor(u)} title="Reset password" className="text-[#71717A] hover:text-white p-1 mr-1"><KeyRound size={15} /></button>
-                        <button onClick={() => toggleActive(u)} title="Enable/disable" className="text-[#71717A] hover:text-amber-400 p-1 mr-1">{u.active !== false ? <Ban size={15} /> : <CheckCircle2 size={15} />}</button>
+                        <button data-testid={`reset-pw-btn-${u.id}`} onClick={() => setPwFor(u)} title="Reset password" className="text-[#71717A] hover:text-white p-1 mr-1"><KeyRound size={15} /></button>
+                        <button data-testid={`toggle-active-${u.id}`} onClick={() => toggleActive(u)} title="Enable/disable" className="text-[#71717A] hover:text-amber-400 p-1 mr-1">{u.active !== false ? <Ban size={15} /> : <CheckCircle2 size={15} />}</button>
                         <button data-testid={`delete-user-${u.id}`} onClick={() => remove(u)} className="text-[#71717A] hover:text-red-400 p-1"><Trash2 size={15} /></button>
                       </>
                     )}
