@@ -16,7 +16,11 @@ Build a fully dynamic, professional website "Executive Distribution" (Import/Exp
 - Design: `/app/design_guidelines.json` (Playfair Display + Manrope, obsidian + steel blue).
 
 ## Implemented (2026-06)
-- **AI Auto-Draft Quote:** admin describes a shipment in plain English → AI extracts line items + required documents; backend computes fees/customs/tax from Fee Calculator rules; draft opens pre-filled in the quote editor → save → one-click watermarked PDF. (`POST /api/documents/ai-draft`)
+- **HS/tariff codes:** AI auto-suggests a 6-digit HS code per line item; editable in the quote editor; rendered on the PDF under each item.
+- **AI Refine/Regenerate:** inside the quote editor, an instruction box regenerates the draft (line items, totals, docs) via the AI.
+- **Direct PDF download:** generated documents are downloadable straight from the document row (and the Send-to-Client folder).
+- **Integrations (saved for later):** Settings → Integrations lets admin connect an email service (Resend/SendGrid) — provider, from-email, API key stored server-side (secrets never exposed via API). Actual email sending is NOT enabled yet.
+- **AI Auto-Draft Quote:** describe a shipment → AI extracts line items + required documents; backend computes fees/customs/tax from Fee Calculator rules; draft opens pre-filled → save → one-click watermarked PDF.
 - Public site: Hero, stats, dynamic services grid, dynamic service detail pages, about, contact.
 - **AI Assistant (pluggable):** OpenAI/Anthropic/Gemini via emergentintegrations. Default Emergent key + admin BYO key in Settings. Public floating chat concierge (fees/docs/services + guides to quote form) and admin ops assistant (streaming).
 - **Fee/customs calculator:** rule-based numbers (`/api/calculate`, rates editable in Settings) + AI explains required documents.

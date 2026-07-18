@@ -279,9 +279,15 @@ async def get_settings():
 @api_router.put("/settings")
 async def update_settings(payload: dict, user: dict = Depends(get_current_user)):
     payload.pop("_id", None)
+    payload.pop("has_own_key", None)
+    payload.pop("has_email_key", None)
     await db.settings.update_one({"_id": "site"}, {"$set": payload}, upsert=True)
     doc = await db.settings.find_one({"_id": "site"})
     doc.pop("_id", None)
+    own = (doc.pop("ai_own_key", "") or "").strip()
+    doc["has_own_key"] = bool(own)
+    email_key = (doc.pop("email_api_key", "") or "").strip()
+    doc["has_email_key"] = bool(email_key)
     return doc
 
 
