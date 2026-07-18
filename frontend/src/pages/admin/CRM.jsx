@@ -122,10 +122,19 @@ function Clients() {
   const [clients, setClients] = useState([]);
   const [editing, setEditing] = useState(null);
   const [portalExpiry, setPortalExpiry] = useState("");
+  const [clientDocs, setClientDocs] = useState([]);
   const EMPTY = { name: "", company: "", email: "", phone: "", status: "lead", value: 0, tags: [], notes: "" };
 
   const load = () => api.get("/clients").then((r) => setClients(r.data)).catch(() => {});
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    if (editing?.id) {
+      api.get(`/clients/${editing.id}/documents`).then((r) => setClientDocs(r.data)).catch(() => setClientDocs([]));
+    } else {
+      setClientDocs([]);
+    }
+  }, [editing?.id]);
 
   const save = async () => {
     if (!editing.name.trim()) return toast.error("Name required");
@@ -248,6 +257,30 @@ function Clients() {
                         <option value="90">Expires in 90 days</option>
                       </select>
                       <button data-testid="gen-portal" onClick={genPortal} className="border border-[#4A7C94]/60 text-[#4A7C94] hover:bg-[#4A7C94]/10 rounded-sm px-4 py-2 text-sm flex items-center gap-2 transition-colors"><Link2 size={15} /> Generate portal link</button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {editing.id && (
+                <div className="border-t border-[#27272A] pt-4">
+                  <div className="flex items-center gap-2 label-caps mb-3"><FileText size={14} /> Documents ({clientDocs.length})</div>
+                  {clientDocs.length === 0 ? (
+                    <p className="text-xs text-[#71717A]">No quotes or receipts linked to this client yet. Create one in the Documents section and pick this client.</p>
+                  ) : (
+                    <div className="space-y-2" data-testid="client-documents">
+                      {clientDocs.map((d) => (
+                        <div key={d.id} data-testid={`client-doc-${d.id}`} className="flex items-center justify-between border border-[#27272A] rounded-sm px-3 py-2 text-sm">
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">{d.number || d.doc_type} <span className="text-[#71717A] uppercase text-xs ml-1">{d.doc_type}</span></div>
+                            <div className="text-xs text-[#71717A]">{d.date || ""} · ${Number(d.grand_total || 0).toLocaleString()} · <span className={d.status === "generated" ? "text-emerald-400" : ""}>{d.status}</span></div>
+                          </div>
+                          {d.pdf_file_id && (
+                            <a data-testid={`client-doc-download-${d.id}`} href={fileUrl(`/api/files/${d.pdf_file_id}/raw`)} target="_blank" rel="noreferrer"
+                              className="shrink-0 text-emerald-400 hover:text-white p-1" title="Download PDF"><Download size={15} /></a>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>

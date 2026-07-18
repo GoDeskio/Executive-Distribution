@@ -162,21 +162,38 @@ export default function Settings() {
           </div>
 
           <div className="border-t border-[#27272A] pt-5">
-            <div className="text-sm font-medium mb-1">Social Login — Stytch</div>
-            <p className="text-xs text-[#71717A] mb-3">Connect Stytch to offer social / passwordless login. Saved for later — social login activation is coming soon.</p>
+            <div className="text-sm font-medium mb-1">Social Login — Stitch</div>
+            <p className="text-xs text-[#71717A] mb-3">Connect Stitch to offer social / passwordless login. Saved for later — social login activation is coming soon.</p>
             <label className="flex items-center gap-2 text-sm mb-3">
               <input type="checkbox" data-testid="social-login-enabled" checked={!!s.social_login_enabled} onChange={(e) => setS({ ...s, social_login_enabled: e.target.checked })} className="accent-[#4A7C94]" />
               Enable social login (when available)
             </label>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="label-caps block mb-2">Stytch Project ID</label>
+                <label className="label-caps block mb-2">Stitch Project ID</label>
                 <input data-testid="stytch-project" value={s.stytch_project_id || ""} onChange={(e) => setS({ ...s, stytch_project_id: e.target.value })} className={inp} placeholder="project-live-…" />
               </div>
               <div>
-                <label className="label-caps block mb-2">Stytch Secret {s.has_stytch_secret && <span className="text-xs text-emerald-400">(on file)</span>}</label>
+                <label className="label-caps block mb-2">Stitch Secret {s.has_stytch_secret && <span className="text-xs text-emerald-400">(on file)</span>}</label>
                 <input data-testid="stytch-secret" type="password" value={stytchSecret} onChange={(e) => setStytchSecret(e.target.value)} className={inp}
                   placeholder={s.has_stytch_secret ? "•••••••• (leave blank to keep)" : "secret-live-…"} />
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-[#27272A] pt-5">
+            <div className="text-sm font-medium mb-1">Login Security</div>
+            <p className="text-xs text-[#71717A] mb-3">Protect admin accounts from brute-force attacks. After the maximum failed attempts, the account is temporarily locked.</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="label-caps block mb-2">Max Failed Attempts</label>
+                <input data-testid="lockout-max-attempts" type="number" min={1} value={s.lockout_max_attempts ?? 5}
+                  onChange={(e) => setS({ ...s, lockout_max_attempts: Math.max(1, parseInt(e.target.value) || 1) })} className={inp} />
+              </div>
+              <div>
+                <label className="label-caps block mb-2">Lockout Duration (minutes)</label>
+                <input data-testid="lockout-minutes" type="number" min={1} value={s.lockout_minutes ?? 15}
+                  onChange={(e) => setS({ ...s, lockout_minutes: Math.max(1, parseInt(e.target.value) || 1) })} className={inp} />
               </div>
             </div>
           </div>

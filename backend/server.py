@@ -197,12 +197,55 @@ class TrackInput(BaseModel):
 # ---------------------------------------------------------------------------
 # Auth routes
 # ---------------------------------------------------------------------------
+async def _lockout_config():
+    s = await _get_settings_doc()
+    try:
+        max_attempts = int(s.get("lockout_max_attempts", 5) or 5)
+    except (TypeError, ValueError):
+        max_attempts = 5
+    try:
+        lock_minutes = int(s.get("lockout_minutes", 15) or 15)
+    except (TypeError, ValueError):
+        lock_minutes = 15
+    return max(1, max_attempts), max(1, lock_minutes)
+
+
 @api_router.post("/auth/login")
 async def login(data: LoginInput):
     email = data.email.lower()
     user = await db.users.find_one({"email": email})
+    max_attempts, lock_minutes = await _lockout_config()
+    now = datetime.now(timezone.utc)
+
+    # If account is currently locked, reject early
+    if user and user.get("locked_until"):
+        try:
+            lu = datetime.fromisoformat(user["locked_until"])
+        except (TypeError, ValueError):
+            lu = None
+        if lu and lu > now:
+            mins = max(1, int((lu - now).total_seconds() // 60) + 1)
+            raise HTTPException(status_code=429,
+                                detail=f"Account locked due to too many failed attempts. Try again in {mins} minute(s).")
+
     if not user or not verify_password(data.password, user["password_hash"]):
+        if user:
+            attempts = int(user.get("failed_attempts", 0) or 0) + 1
+            if attempts >= max_attempts:
+                locked_until = (now + timedelta(minutes=lock_minutes)).isoformat()
+                await db.users.update_one({"_id": user["_id"]},
+                                          {"$set": {"failed_attempts": 0, "locked_until": locked_until}})
+                raise HTTPException(status_code=429,
+                                    detail=f"Too many failed attempts. Account locked for {lock_minutes} minute(s).")
+            await db.users.update_one({"_id": user["_id"]}, {"$set": {"failed_attempts": attempts}})
+            remaining = max_attempts - attempts
+            raise HTTPException(status_code=401,
+                                detail=f"Invalid email or password. {remaining} attempt(s) remaining before lockout.")
         raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    # Successful login — reset any counters/locks
+    if user.get("failed_attempts") or user.get("locked_until"):
+        await db.users.update_one({"_id": user["_id"]}, {"$set": {"failed_attempts": 0, "locked_until": None}})
     token = create_access_token(str(user["_id"]), email)
     return {"token": token, "user": clean(user)}
 
@@ -442,6 +485,12 @@ async def update_client(client_id: str, data: ClientInput, user: dict = Depends(
 async def delete_client(client_id: str, user: dict = Depends(require_perm("crm"))):
     await db.clients.delete_one({"_id": ObjectId(client_id)})
     return {"ok": True}
+
+
+@api_router.get("/clients/{client_id}/documents")
+async def client_documents(client_id: str, user: dict = Depends(require_perm("crm"))):
+    docs = await db.documents.find({"client_id": client_id}).sort("created_at", -1).to_list(500)
+    return [clean(d) for d in docs]
 
 
 class PortalTokenInput(BaseModel):
@@ -1175,6 +1224,59 @@ async def global_search(q: str = "", user: dict = Depends(get_current_user)):
 
 
 # ---------------------------------------------------------------------------
+# Public SEO: sitemap.xml & robots.txt
+# ---------------------------------------------------------------------------
+def _resolve_base_url(settings: dict, request: Request) -> str:
+    base = (settings.get("site_url") or "").strip().rstrip("/")
+    if base:
+        return base
+    fwd_host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+    fwd_proto = request.headers.get("x-forwarded-proto", "https")
+    if fwd_host:
+        return f"{fwd_proto}://{fwd_host}"
+    return str(request.base_url).rstrip("/")
+
+
+@api_router.get("/sitemap.xml")
+async def sitemap(request: Request):
+    settings = await _get_settings_doc()
+    base = _resolve_base_url(settings, request)
+    services = await db.services.find({"published": True}).to_list(500)
+    urls = [
+        {"loc": f"{base}/", "priority": "1.0"},
+        {"loc": f"{base}/#services", "priority": "0.8"},
+        {"loc": f"{base}/#about", "priority": "0.6"},
+        {"loc": f"{base}/#contact", "priority": "0.6"},
+    ]
+    for p in (settings.get("page_seo") or []):
+        path = (p.get("path") or "").strip()
+        if path and not any(u["loc"].endswith(path) for u in urls):
+            urls.append({"loc": f"{base}/{path.lstrip('/')}", "priority": "0.7"})
+    for sv in services:
+        slug = sv.get("slug")
+        if slug:
+            urls.append({"loc": f"{base}/services/{slug}", "priority": "0.8"})
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    items = "".join(
+        f"<url><loc>{u['loc']}</loc><lastmod>{today}</lastmod>"
+        f"<changefreq>weekly</changefreq><priority>{u['priority']}</priority></url>"
+        for u in urls
+    )
+    xml = ('<?xml version="1.0" encoding="UTF-8"?>'
+           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+           f"{items}</urlset>")
+    return Response(content=xml, media_type="application/xml")
+
+
+@api_router.get("/robots.txt")
+async def robots(request: Request):
+    settings = await _get_settings_doc()
+    base = _resolve_base_url(settings, request)
+    txt = f"User-agent: *\nAllow: /\n\nSitemap: {base}/api/sitemap.xml\n"
+    return Response(content=txt, media_type="text/plain")
+
+
+# ---------------------------------------------------------------------------
 # Startup
 # ---------------------------------------------------------------------------
 DEFAULT_SERVICES = [
@@ -1248,6 +1350,10 @@ DEFAULT_SETTINGS = {
     "social_login_enabled": False,
     "stytch_project_id": "",
     "stytch_secret": "",
+    "site_url": "",
+    "page_seo": [],
+    "lockout_max_attempts": 5,
+    "lockout_minutes": 15,
 }
 
 
