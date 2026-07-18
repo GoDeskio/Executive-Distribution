@@ -35,6 +35,7 @@ export function Backups() {
         backup_schedule_enabled: !!cfg.backup_schedule_enabled,
         backup_schedule_interval_hours: Math.max(1, parseInt(cfg.backup_schedule_interval_hours) || 24),
         backup_retention: Math.max(1, parseInt(cfg.backup_retention) || 7),
+        alert_on_backup: !!cfg.alert_on_backup,
       };
       await api.put("/settings", payload);
       toast.success("Backup settings saved");
@@ -136,6 +137,11 @@ export function Backups() {
         {cfg.backup_last_scheduled_at && (
           <p className="text-xs text-[#71717A]">Last scheduled backup: {new Date(cfg.backup_last_scheduled_at).toLocaleString()}</p>
         )}
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" data-testid="backup-alert-slack" checked={!!cfg.alert_on_backup} onChange={(e) => setCfg({ ...cfg, alert_on_backup: e.target.checked })} className="accent-[#4A7C94]" />
+          Send a Slack alert after each scheduled backup
+          {!cfg.has_slack_webhook && <span className="text-xs text-amber-400">(add a Slack webhook in Settings first)</span>}
+        </label>
       </div>
 
       {/* Actions */}

@@ -22,6 +22,8 @@ async def backup_config(user: dict = Depends(require_superadmin)):
         "backup_schedule_enabled": bool(s.get("backup_schedule_enabled", False)),
         "backup_schedule_interval_hours": int(s.get("backup_schedule_interval_hours", 24) or 24),
         "backup_retention": int(s.get("backup_retention", 7) or 7),
+        "alert_on_backup": bool(s.get("alert_on_backup", False)),
+        "has_slack_webhook": bool((s.get("slack_webhook_url") or "").strip()),
         "backup_last_scheduled_at": s.get("backup_last_scheduled_at") or "",
         "server_backups": list_disk_backups(s),
     }

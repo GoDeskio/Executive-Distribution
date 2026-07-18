@@ -106,9 +106,11 @@ async def _update_poller():
 
 async def _backup_poller():
     """Scheduled automatic backups to the server folder, pruned to the retention count."""
+    from core.notify import send_slack
     await asyncio.sleep(120)
     while True:
         interval_hours = 24
+        s = {}
         try:
             s = await get_settings_doc()
             interval_hours = int(s.get("backup_schedule_interval_hours", 24) or 24)
@@ -129,8 +131,17 @@ async def _backup_poller():
                                                  {"$set": {"backup_last_scheduled_at": now_iso(),
                                                            "backup_last_scheduled_file": info.get("filename")}})
                     logger.info(f"scheduled backup saved: {info.get('filename')} (pruned {len(removed)})")
+                    if s.get("alert_on_backup"):
+                        mb = (info.get("size", 0) or 0) / 1e6
+                        await send_slack(s, f":floppy_disk: *Scheduled backup complete* — `{info.get('filename')}` "
+                                            f"({mb:.1f} MB). Kept the last {int(s.get('backup_retention', 7) or 7)}.")
         except Exception as e:
             logger.warning(f"backup poller error: {e}")
+            try:
+                if s.get("backup_schedule_enabled") and s.get("alert_on_backup"):
+                    await send_slack(s, f":warning: *Scheduled backup FAILED* — {str(e)[:200]}")
+            except Exception:
+                pass
         await asyncio.sleep(max(1, min(interval_hours, 24)) * 3600)
 
 
