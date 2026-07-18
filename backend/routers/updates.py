@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends
 from core.db import db
 from core.security import require_superadmin
 from core.settings_store import get_settings_doc
-from core.updater import run_check, status_from_settings
+from core.updater import run_check, status_from_settings, run_update_script
 from core.audit import log_action
 from core.utils import now_iso
 
@@ -55,38 +55,10 @@ async def updates_mark_current(user: dict = Depends(require_superadmin)):
 
 @router.post("/updates/apply")
 async def updates_apply(user: dict = Depends(require_superadmin)):
-    """Runs a self-host update script if configured via the UPDATE_SCRIPT env var.
-    On managed hosting (no script), returns guidance to use the platform Deploy."""
+    """Runs a self-host update script if UPDATE_SCRIPT is configured; on managed
+    hosting returns guidance to use the platform Deploy."""
     settings = await get_settings_doc()
-    script = os.environ.get("UPDATE_SCRIPT", "").strip()
-    if not script or not os.path.exists(script):
-        return {
-            "ok": False,
-            "managed": True,
-            "message": ("Automatic apply isn't available in this hosting environment. "
-                        "Use your platform's Deploy to publish the new version. "
-                        "For self-hosting, set the UPDATE_SCRIPT env var to your update script "
-                        "(see deploy/update.sh) and this button will run it."),
-        }
-    import asyncio
-    async def _run():
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                "/bin/bash", script,
-                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
-            out, _ = await proc.communicate()
-            ok = proc.returncode == 0
-            latest = (settings.get("update_latest_version") or "").strip()
-            update = {"update_last_apply": now_iso(),
-                      "update_last_apply_ok": ok,
-                      "update_last_apply_log": (out or b"").decode(errors="ignore")[-2000:]}
-            if ok and latest:
-                update["update_current_version"] = latest
-                update["update_available"] = False
-            await db.settings.update_one({"_id": "site"}, {"$set": update})
-        except Exception as e:
-            await db.settings.update_one({"_id": "site"},
-                                         {"$set": {"update_last_apply_ok": False, "update_last_apply_log": str(e)[:500]}})
-    asyncio.create_task(_run())
-    await log_action(user, "generate", "settings", detail="triggered self-host update script")
-    return {"ok": True, "managed": False, "message": "Update script started. Services may restart shortly."}
+    result = await run_update_script(settings)
+    if result.get("ok"):
+        await log_action(user, "generate", "settings", detail="triggered self-host update script")
+    return result

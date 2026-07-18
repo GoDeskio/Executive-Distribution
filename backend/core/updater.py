@@ -101,6 +101,43 @@ async def run_check(settings: dict):
             "current_version": current, **cache}
 
 
+async def run_update_script(settings: dict):
+    """Runs the self-host update script referenced by the UPDATE_SCRIPT env var.
+    Data stores (MongoDB, uploads volume) are external and untouched. On managed
+    hosting (no script) this is a safe no-op that returns guidance."""
+    import os
+    import asyncio
+
+    script = os.environ.get("UPDATE_SCRIPT", "").strip()
+    if not script or not os.path.exists(script):
+        return {"ok": False, "managed": True,
+                "message": ("Automatic apply isn't available in this hosting environment. "
+                            "Use your platform's Deploy to publish the new version. For self-hosting, "
+                            "set the UPDATE_SCRIPT env var to your update script (see deploy/update.sh).")}
+
+    async def _run():
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "/bin/bash", script,
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+            out, _ = await proc.communicate()
+            ok = proc.returncode == 0
+            latest = (settings.get("update_latest_version") or "").strip()
+            upd = {"update_last_apply": now_iso(), "update_last_apply_ok": ok,
+                   "update_last_apply_log": (out or b"").decode(errors="ignore")[-2000:]}
+            if ok and latest:
+                upd["update_current_version"] = latest
+                upd["update_available"] = False
+            await db.settings.update_one({"_id": "site"}, {"$set": upd})
+        except Exception as e:
+            await db.settings.update_one({"_id": "site"},
+                                         {"$set": {"update_last_apply_ok": False, "update_last_apply_log": str(e)[:500]}})
+
+    import asyncio as _a
+    _a.create_task(_run())
+    return {"ok": True, "managed": False, "message": "Update script started. Services may restart shortly."}
+
+
 def status_from_settings(settings: dict):
     return {
         "configured": bool((settings.get("update_repo_url") or "").strip()),

@@ -1,4 +1,5 @@
 import os
+import asyncio
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
@@ -7,7 +8,8 @@ from core.db import client, db
 from core.config import ALL_PERMS
 from core.utils import now_iso, slugify, logger
 from core.security import hash_password, verify_password
-from core.settings_store import DEFAULT_SERVICES, DEFAULT_SETTINGS
+from core.settings_store import DEFAULT_SERVICES, DEFAULT_SETTINGS, get_settings_doc
+from core.updater import run_check, run_update_script
 from storage import init_storage
 
 from routers import (auth, users, services, settings, clients, portal,
@@ -73,9 +75,39 @@ async def startup():
     except Exception as e:
         logger.error(f"Storage init failed: {e}")
 
+    app.state.update_poller = asyncio.create_task(_update_poller())
+
+
+# Interval between automatic update checks (seconds). Default: 24h.
+UPDATE_CHECK_INTERVAL = int(os.environ.get("UPDATE_CHECK_INTERVAL_SECONDS", 86400))
+UPDATE_CHECK_INITIAL_DELAY = 90  # let the app settle before the first check
+
+
+async def _update_poller():
+    """Periodically checks GitHub for a new version so the 'Update available'
+    banner surfaces on its own — no admin needs to open the dashboard. Pull/notify
+    only; auto-apply runs only when explicitly enabled AND a self-host script exists."""
+    await asyncio.sleep(UPDATE_CHECK_INITIAL_DELAY)
+    while True:
+        try:
+            s = await get_settings_doc()
+            if (s.get("update_repo_url") or "").strip() and s.get("update_auto_check", True):
+                result = await run_check(s)
+                if result.get("update_available"):
+                    logger.info(f"Update available: {result.get('update_latest_version')}")
+                    if s.get("update_auto_apply") and os.environ.get("UPDATE_SCRIPT"):
+                        fresh = await get_settings_doc()
+                        await run_update_script(fresh)
+        except Exception as e:
+            logger.warning(f"update poller error: {e}")
+        await asyncio.sleep(UPDATE_CHECK_INTERVAL)
+
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    task = getattr(app.state, "update_poller", None)
+    if task:
+        task.cancel()
     client.close()
 
 
