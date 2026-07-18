@@ -11,12 +11,12 @@ from core.settings_store import DEFAULT_SERVICES, DEFAULT_SETTINGS
 from storage import init_storage
 
 from routers import (auth, users, services, settings, clients, portal,
-                     notifications, quotes, files, analytics, chat, documents, search, audit)
+                     notifications, quotes, files, analytics, chat, documents, search, audit, updates)
 
 app = FastAPI()
 
 for module in (auth, users, services, settings, clients, portal, notifications,
-               quotes, files, analytics, chat, documents, search, audit):
+               quotes, files, analytics, chat, documents, search, audit, updates):
     app.include_router(module.router)
 
 
@@ -39,6 +39,9 @@ async def startup():
                                    "active": True, "avatar_url": "", "created_at": now_iso()})
         logger.info("Seeded superadmin user")
     else:
+        # Non-destructive repair only. NEVER overwrite an existing admin's password
+        # or any other user/site data — chosen credentials must persist across
+        # restarts and auto-updates.
         updates = {}
         if existing.get("role") != "superadmin":
             updates["role"] = "superadmin"
@@ -46,8 +49,6 @@ async def startup():
             updates["permissions"] = ALL_PERMS
         if existing.get("active") is None:
             updates["active"] = True
-        if not verify_password(admin_password, existing["password_hash"]):
-            updates["password_hash"] = hash_password(admin_password)
         if updates:
             await db.users.update_one({"email": admin_email}, {"$set": updates})
 

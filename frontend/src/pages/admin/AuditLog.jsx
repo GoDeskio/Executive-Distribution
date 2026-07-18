@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { RefreshCw, ShieldAlert } from "lucide-react";
-import api from "@/lib/api";
+import { RefreshCw, ShieldAlert, Download } from "lucide-react";
+import api, { API } from "@/lib/api";
 import { AdminHeader } from "./AdminHeader";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
@@ -33,9 +33,29 @@ export default function AuditLog() {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [entity, action]);
 
+  const exportCsv = () => {
+    const params = new URLSearchParams();
+    if (entity !== "all") params.set("entity", entity);
+    if (action !== "all") params.set("action", action);
+    const token = localStorage.getItem("ed_token");
+    fetch(`${API}/audit/export.csv?${params.toString()}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.blob())
+      .then((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = "audit-log.csv"; a.click();
+        URL.revokeObjectURL(url);
+      })
+      .catch(() => {});
+  };
+
   return (
     <div>
       <AdminHeader title="Audit Log" subtitle="Who did what, and when — across the whole system">
+        <button data-testid="audit-export" onClick={exportCsv}
+          className="border border-[#27272A] hover:border-[#4A7C94] text-[#A1A1AA] hover:text-white px-4 py-2 rounded-sm text-sm flex items-center gap-2 transition-colors">
+          <Download size={15} /> Export CSV
+        </button>
         <button data-testid="audit-refresh" onClick={load}
           className="border border-[#27272A] hover:border-[#4A7C94] text-[#A1A1AA] hover:text-white px-4 py-2 rounded-sm text-sm flex items-center gap-2 transition-colors">
           <RefreshCw size={15} className={loading ? "animate-spin" : ""} /> Refresh

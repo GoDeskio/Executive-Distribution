@@ -22,6 +22,8 @@ def _sanitize_settings(doc: dict) -> dict:
     doc["has_slack_webhook"] = bool(slack)
     stytch = (doc.pop("stytch_secret", "") or "").strip()
     doc["has_stytch_secret"] = bool(stytch)
+    upd = (doc.pop("update_token", "") or "").strip()
+    doc["has_update_token"] = bool(upd)
     return doc
 
 
@@ -40,6 +42,7 @@ async def update_settings(payload: dict, user: dict = Depends(require_any_perm("
     payload.pop("has_email_key", None)
     payload.pop("has_slack_webhook", None)
     payload.pop("has_stytch_secret", None)
+    payload.pop("has_update_token", None)
     seo_touched = any(k in payload for k in ("page_seo", "seo_title", "seo_description", "seo_keywords", "site_url"))
     await db.settings.update_one({"_id": "site"}, {"$set": payload}, upsert=True)
     await log_action(user, "update", "settings", detail=", ".join(sorted(payload.keys()))[:200])

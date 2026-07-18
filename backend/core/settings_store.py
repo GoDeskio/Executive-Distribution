@@ -117,4 +117,10 @@ DEFAULT_SETTINGS = {
     "lockout_minutes": 15,
     "search_engine_ping_enabled": False,
     "indexnow_key": "",
+    "update_repo_url": "",
+    "update_branch": "main",
+    "update_token": "",
+    "update_auto_check": True,
+    "update_auto_apply": False,
+    "update_current_version": "",
 }

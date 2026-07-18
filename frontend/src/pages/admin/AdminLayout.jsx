@@ -1,11 +1,12 @@
 import { NavLink, useNavigate, Outlet } from "react-router-dom";
 import {
   LayoutDashboard, Package, Users, HardDrive, Search as SearchIcon, Settings as SettingsIcon,
-  User, LogOut, Ship, Sparkles, FileText, Bell, Shield, ScrollText,
+  User, LogOut, Ship, Sparkles, FileText, Bell, Shield, ScrollText, AlertTriangle,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { fileUrl } from "@/lib/api";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import api from "@/lib/api";
 
 const NAV = [
@@ -29,6 +30,7 @@ export default function AdminLayout() {
   const [logo, setLogo] = useState("");
   const [q, setQ] = useState("");
   const [unread, setUnread] = useState(0);
+  const [updateInfo, setUpdateInfo] = useState(null);
 
   useEffect(() => {
     api.get("/settings").then((r) => {
@@ -36,6 +38,13 @@ export default function AdminLayout() {
       if (r.data.logo_url) setLogo(r.data.logo_url);
     }).catch(() => {});
   }, []);
+
+  const isSuper = user?.role === "superadmin";
+
+  useEffect(() => {
+    if (!isSuper) return;
+    api.get("/updates/status").then((r) => setUpdateInfo(r.data)).catch(() => {});
+  }, [isSuper]);
 
   useEffect(() => {
     const fetchCount = () => api.get("/notifications/unread-count").then((r) => setUnread(r.data.count)).catch(() => {});
@@ -47,7 +56,6 @@ export default function AdminLayout() {
   const doLogout = () => { logout(); navigate("/login"); };
   const doSearch = (e) => { e.preventDefault(); if (q.trim()) navigate(`/admin/search?q=${encodeURIComponent(q.trim())}`); };
 
-  const isSuper = user?.role === "superadmin";
   const canSee = (n) => {
     if (n.superOnly) return isSuper;
     if (!n.perm) return true; // profile always
@@ -116,6 +124,13 @@ export default function AdminLayout() {
       </aside>
 
       <main className="flex-1 ml-64 min-h-screen">
+        {isSuper && updateInfo?.update_available && (
+          <Link to="/admin" data-testid="update-banner"
+            className="flex items-center gap-2 bg-amber-600/90 hover:bg-amber-600 text-white text-sm px-6 py-2.5 transition-colors">
+            <AlertTriangle size={16} />
+            A new version ({updateInfo.latest_version}) is available. Open the Dashboard to review &amp; apply.
+          </Link>
+        )}
         <Outlet />
       </main>
     </div>

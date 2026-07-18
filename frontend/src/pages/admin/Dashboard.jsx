@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
-import { Users, Eye, Briefcase, Package, Activity, Inbox, CheckCircle2, Bell } from "lucide-react";
-import api from "@/lib/api";
+import { Users, Eye, Briefcase, Package, Activity, Inbox, CheckCircle2, Bell, ScrollText, Download } from "lucide-react";
+import api, { API } from "@/lib/api";
 import { AdminHeader } from "./AdminHeader";
+import { useAuth } from "@/context/AuthContext";
+import { SoftwareUpdates } from "@/components/admin/SoftwareUpdates";
 
 function Stat({ icon: Icon, label, value, accent }) {
   return (
@@ -31,6 +33,9 @@ export default function Dashboard() {
   const [heatPath, setHeatPath] = useState("/");
   const [pathOptions, setPathOptions] = useState(PAGE_OPTIONS);
   const [notifs, setNotifs] = useState([]);
+  const [audit, setAudit] = useState([]);
+  const { user } = useAuth();
+  const isSuper = user?.role === "superadmin";
 
   useEffect(() => {
     api.get("/analytics/overview").then((r) => setOverview(r.data)).catch(() => {});
@@ -45,6 +50,23 @@ export default function Dashboard() {
       if (r.data.some((n) => !n.read)) api.post("/notifications/read").catch(() => {});
     }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (isSuper) api.get("/audit?limit=10").then((r) => setAudit(r.data)).catch(() => {});
+  }, [isSuper]);
+
+  const exportAudit = () => {
+    const token = localStorage.getItem("ed_token");
+    fetch(`${API}/audit/export.csv`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.blob())
+      .then((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = "audit-log.csv"; a.click();
+        URL.revokeObjectURL(url);
+      })
+      .catch(() => {});
+  };
 
   useEffect(() => {
     api.get(`/analytics/heatmap?path=${encodeURIComponent(heatPath)}`)
@@ -67,6 +89,8 @@ export default function Dashboard() {
           <Stat icon={Briefcase} label="Clients" value={overview.total_clients ?? 0} />
           <Stat icon={Package} label="Services" value={overview.total_services ?? 0} />
         </div>
+
+        {isSuper && <SoftwareUpdates />}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 bg-[#121214] border border-[#27272A] rounded-md p-6">
@@ -120,6 +144,32 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+
+        {/* SYSTEM ACTIVITY (audit) — superadmin only */}
+        {isSuper && (
+          <div data-testid="system-activity" className="bg-[#121214] border border-[#27272A] rounded-md p-6">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2 label-caps"><ScrollText size={14} /> System Activity</div>
+              <button data-testid="audit-export-csv" onClick={exportAudit}
+                className="inline-flex items-center gap-2 border border-[#27272A] hover:border-[#4A7C94] text-[#A1A1AA] hover:text-white px-3 py-1.5 rounded-sm text-xs transition-colors">
+                <Download size={13} /> Export CSV
+              </button>
+            </div>
+            {audit.length === 0 ? (
+              <p className="text-sm text-[#71717A]">No system activity recorded yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {audit.slice(0, 10).map((a) => (
+                  <div key={a.id} className="flex items-center gap-3 text-sm border-b border-[#27272A]/50 pb-3 last:border-0">
+                    <span className="text-[#4A7C94] font-medium w-16 shrink-0">{a.action}</span>
+                    <span className="flex-1 truncate"><span className="text-[#A1A1AA]">{a.user_email || "system"}</span> · {a.entity}{a.detail ? ` — ${a.detail}` : ""}</span>
+                    <span className="text-xs text-[#71717A] shrink-0">{a.created_at ? new Date(a.created_at).toLocaleString() : ""}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* HEATMAP */}
         <div className="bg-[#121214] border border-[#27272A] rounded-md p-6">
