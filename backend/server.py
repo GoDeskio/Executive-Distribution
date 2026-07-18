@@ -425,7 +425,10 @@ async def portal_approve(token: str, data: PortalApproveInput):
         "read": False, "created_at": now_iso(),
     })
     settings = await _get_settings_doc()
-    _send_approval_alerts(settings, client.get("name", ""), doc.get("number", ""), doc.get("grand_total", 0))
+    import asyncio
+    asyncio.create_task(asyncio.to_thread(
+        _send_approval_alerts, settings, client.get("name", ""), doc.get("number", ""), doc.get("grand_total", 0)
+    ))
     return {"ok": True, "status": "approved"}
 
 

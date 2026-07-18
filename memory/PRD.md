@@ -16,8 +16,9 @@ Build a fully dynamic, professional website "Executive Distribution" (Import/Exp
 - Design: `/app/design_guidelines.json` (Playfair Display + Manrope, obsidian + steel blue).
 
 ## Implemented (2026-06)
-- **Client Portal:** each client can get a private tokenized link (`/portal/{token}`, no login) to view & download their own quotes/receipts. Admin generates/copies/revokes the link from the client record in CRM. Branded public page (logo, company, contact).
-- **HS/tariff codes:** AI auto-suggests a 6-digit HS code per line item; editable; rendered on the PDF.
+- **Approval alerts + social login connect:** Settings → Integrations now has Slack approval alerts (webhook + "alert on approval" toggle; fires a best-effort Slack message when a client approves a quote, run off the event loop) and a **Stytch** social-login connect option (project id + secret + enable toggle, saved for later). All secrets sanitized from the API.
+- **Client Portal:** tokenized private link (no login) to view/download quotes/receipts, one-click **quote approval** → admin notification (bell + Dashboard Recent Activity), per-document share toggle, link expiry.
+- **HS/tariff codes:** AI-suggested per line item; editable; on the PDF.
 - **AI Refine/Regenerate:** inside the quote editor, an instruction box regenerates the draft (line items, totals, docs) via the AI.
 - **Direct PDF download:** generated documents are downloadable straight from the document row (and the Send-to-Client folder).
 - **Integrations (saved for later):** Settings → Integrations lets admin connect an email service (Resend/SendGrid) — provider, from-email, API key stored server-side (secrets never exposed via API). Actual email sending is NOT enabled yet.
