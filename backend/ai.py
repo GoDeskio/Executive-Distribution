@@ -50,3 +50,15 @@ async def stream_reply(session_id: str, system_message: str, history: list, user
     except Exception as e:
         logger.error(f"AI stream error: {e}")
         yield f"\n[AI error: {str(e)[:200]}]"
+
+
+async def complete(session_id: str, system_message: str, prompt: str, settings: dict) -> str:
+    """Non-streaming: accumulate the full response as a single string."""
+    chat = build_chat(session_id, system_message, settings)
+    out = []
+    async for event in chat.stream_message(UserMessage(text=prompt)):
+        if isinstance(event, TextDelta):
+            out.append(event.content)
+        elif isinstance(event, StreamDone):
+            break
+    return "".join(out)

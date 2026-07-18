@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, X, FileText, Download, FileCheck, FolderDown, Wand2 } from "lucide-react";
+import { Plus, Trash2, X, FileText, Download, FileCheck, FolderDown, Wand2, Sparkles } from "lucide-react";
 import api, { fileUrl, formatApiError } from "@/lib/api";
 import { AdminHeader } from "./AdminHeader";
 
@@ -38,6 +38,8 @@ function Builder() {
   const [docs, setDocs] = useState([]);
   const [clients, setClients] = useState([]);
   const [editing, setEditing] = useState(null);
+  const [ai, setAi] = useState(null); // { desc, client_id }
+  const [aiBusy, setAiBusy] = useState(false);
 
   const load = () => api.get("/documents").then((r) => setDocs(r.data)).catch(() => {});
   useEffect(() => { load(); api.get("/clients").then((r) => setClients(r.data)).catch(() => {}); }, []);
@@ -81,11 +83,35 @@ function Builder() {
     if (c) setEditing((p) => ({ ...p, client_id: c.id, client_name: c.name, client_company: c.company, client_email: c.email, client_phone: c.phone }));
   };
 
+  const runAiDraft = async () => {
+    if (!ai.desc.trim()) return toast.error("Describe the shipment first");
+    setAiBusy(true);
+    const c = clients.find((x) => x.id === ai.client_id);
+    try {
+      const { data } = await api.post("/documents/ai-draft", {
+        description: ai.desc, doc_type: "quote",
+        client_id: c?.id || "", client_name: c?.name || "",
+      });
+      const draft = {
+        ...EMPTY, ...data,
+        client_company: c?.company || "", client_email: c?.email || "", client_phone: c?.phone || "",
+        line_items: data.line_items?.length ? data.line_items : [{ ...emptyLine }],
+      };
+      setAi(null);
+      setEditing(draft);
+      toast.success("AI draft ready — review and save");
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "AI draft failed");
+    } finally { setAiBusy(false); }
+  };
+
   const t = editing ? totals(editing.line_items, editing.tax_total) : null;
 
   return (
     <div>
       <div className="flex justify-end gap-2 mb-4">
+        <button data-testid="ai-draft-btn" onClick={() => setAi({ desc: "", client_id: "" })}
+          className="border border-[#4A7C94]/60 text-[#4A7C94] hover:bg-[#4A7C94]/10 px-4 py-2 rounded-sm text-sm font-medium flex items-center gap-2 transition-colors"><Sparkles size={16} /> AI Draft Quote</button>
         <button data-testid="new-quote-btn" onClick={() => openNew("quote")} className="bg-[#4A7C94] hover:bg-[#5A8CA4] text-white px-4 py-2 rounded-sm text-sm font-medium flex items-center gap-2 transition-colors"><Plus size={16} /> New Quote</button>
         <button data-testid="new-receipt-btn" onClick={() => openNew("receipt")} className="border border-[#27272A] hover:border-[#4A7C94] px-4 py-2 rounded-sm text-sm flex items-center gap-2 transition-colors"><Plus size={16} /> Receipt</button>
         <button data-testid="new-customs-btn" onClick={() => openNew("customs")} className="border border-[#27272A] hover:border-[#4A7C94] px-4 py-2 rounded-sm text-sm flex items-center gap-2 transition-colors"><Plus size={16} /> Customs</button>
@@ -117,6 +143,37 @@ function Builder() {
           </tbody>
         </table>
       </div>
+
+      {ai && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-6">
+          <div className="bg-[#121214] border border-[#27272A] rounded-md w-full max-w-lg my-8">
+            <div className="flex items-center justify-between p-6 border-b border-[#27272A]">
+              <h2 className="font-display text-lg flex items-center gap-2"><Sparkles size={18} className="text-[#4A7C94]" /> AI Draft Quote</h2>
+              <button data-testid="close-ai-draft" onClick={() => setAi(null)} className="text-[#71717A] hover:text-white"><X size={20} /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <F l="Link Client (optional)">
+                <select data-testid="ai-draft-client" value={ai.client_id} onChange={(e) => setAi({ ...ai, client_id: e.target.value })} className={inp}>
+                  <option value="">— none —</option>
+                  {clients.map((c) => <option key={c.id} value={c.id}>{c.name}{c.company ? ` (${c.company})` : ""}</option>)}
+                </select>
+              </F>
+              <F l="Describe the shipment">
+                <textarea data-testid="ai-draft-desc" rows={5} value={ai.desc} onChange={(e) => setAi({ ...ai, desc: e.target.value })} className={inp}
+                  placeholder="e.g. 300 boxes of premium cigars (~900kg, $60,000) ocean freight from Santo Domingo to Port of Miami, plus 50kg of Larimar worth $12,000." />
+              </F>
+              <p className="text-xs text-[#71717A]">The AI extracts line items and the required documents; fees, customs and taxes are then computed from your Fee Calculator rules. You can edit everything before saving.</p>
+            </div>
+            <div className="flex gap-3 p-6 border-t border-[#27272A]">
+              <button onClick={() => setAi(null)} className="flex-1 border border-[#27272A] hover:bg-[#1A1A1D] rounded-sm py-2.5 text-sm transition-colors">Cancel</button>
+              <button data-testid="run-ai-draft" onClick={runAiDraft} disabled={aiBusy}
+                className="flex-1 bg-[#4A7C94] hover:bg-[#5A8CA4] disabled:opacity-60 rounded-sm py-2.5 text-sm font-medium text-white transition-colors flex items-center justify-center gap-2">
+                {aiBusy ? "Drafting…" : <>Generate Draft <Sparkles size={15} /></>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {editing && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-6">
