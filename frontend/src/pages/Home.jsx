@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, ArrowUpRight, Globe2, ShieldCheck, Timer } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Globe2, ShieldCheck, Timer, Mail, Phone, MapPin } from "lucide-react";
 import api from "@/lib/api";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { ServiceIcon } from "@/components/site/ServiceIcon";
+import { QuoteForm } from "@/components/site/QuoteForm";
 
 const fade = {
   hidden: { opacity: 0, y: 30 },
@@ -147,19 +148,25 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="relative z-10 border-t border-[#27272A] bg-[#121214]">
-        <div className="max-w-7xl mx-auto px-6 lg:px-12 py-24 text-center">
-          <h2 className="font-display text-3xl sm:text-4xl font-bold max-w-3xl mx-auto leading-tight">
-            Ready to move something extraordinary?
-          </h2>
-          <p className="text-[#A1A1AA] max-w-xl mx-auto mt-6">
-            Speak with an Executive Distribution specialist about your sourcing and logistics requirements.
-          </p>
-          <a href="#contact" data-testid="cta-contact"
-             className="inline-flex items-center gap-2 mt-8 bg-[#4A7C94] hover:bg-[#5A8CA4] transition-colors text-white px-8 py-4 rounded-sm font-medium">
-            Start a Conversation <ArrowRight size={18} />
-          </a>
+      {/* QUOTE / CONTACT */}
+      <section id="contact" className="relative z-10 border-t border-[#27272A] bg-[#121214]">
+        <div className="max-w-7xl mx-auto px-6 lg:px-12 py-28 grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
+          <div className="lg:sticky lg:top-28">
+            <div className="label-caps mb-4">Request a Quote</div>
+            <h2 className="font-display text-3xl sm:text-4xl font-bold leading-tight max-w-md">
+              Tell us what you need moved or sourced.
+            </h2>
+            <p className="text-[#A1A1AA] mt-6 leading-relaxed max-w-md">
+              Share a few details and reference images. An Executive Distribution specialist will assess your
+              requirements and respond with a tailored plan — discreetly and without obligation.
+            </p>
+            <div className="mt-8 space-y-4">
+              <div className="flex items-center gap-3 text-sm text-[#A1A1AA]"><Mail size={16} className="text-[#4A7C94]" />{s.contact_email}</div>
+              <div className="flex items-center gap-3 text-sm text-[#A1A1AA]"><Phone size={16} className="text-[#4A7C94]" />{s.phone}</div>
+              <div className="flex items-center gap-3 text-sm text-[#A1A1AA]"><MapPin size={16} className="text-[#4A7C94]" />{s.address}</div>
+            </div>
+          </div>
+          <QuoteForm />
         </div>
       </section>
 

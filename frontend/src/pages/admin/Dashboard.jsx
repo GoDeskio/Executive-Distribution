@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
-import { Users, Eye, Briefcase, Package, Activity } from "lucide-react";
+import { Users, Eye, Briefcase, Package, Activity, Inbox } from "lucide-react";
 import api from "@/lib/api";
 import { AdminHeader } from "./AdminHeader";
 
@@ -55,8 +55,9 @@ export default function Dashboard() {
       </AdminHeader>
 
       <div className="p-8 space-y-8">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <Stat icon={Users} label="Total Visitors" value={overview.total_visitors ?? 0} accent />
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          <Stat icon={Inbox} label="New Requests" value={overview.new_quotes ?? 0} accent />
+          <Stat icon={Users} label="Total Visitors" value={overview.total_visitors ?? 0} />
           <Stat icon={Eye} label="Page Views" value={overview.total_views ?? 0} />
           <Stat icon={Briefcase} label="Clients" value={overview.total_clients ?? 0} />
           <Stat icon={Package} label="Services" value={overview.total_services ?? 0} />

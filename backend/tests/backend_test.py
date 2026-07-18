@@ -223,3 +223,96 @@ def test_profile_wrong_current_password(auth):
     r = requests.put(f"{API}/auth/profile", headers=auth,
                      json={"current_password": "wrong", "new_password": "SomethingNew1!"}, timeout=30)
     assert r.status_code == 400
+
+
+# ---------- Quotes (public create + admin CRUD) ----------
+PNG_BYTES = bytes.fromhex(
+    "89504E470D0A1A0A0000000D49484452000000010000000108060000001F15C4890000000A"
+    "49444154789C6300010000000500010D0A2DB40000000049454E44AE426082"
+)
+
+
+def test_quote_create_public_no_images():
+    data = {
+        "name": f"TEST_Buyer_{uuid.uuid4().hex[:6]}",
+        "email": "buyer@example.com",
+        "company": "TEST Co",
+        "phone": "+123",
+        "destination": "Dubai",
+        "description": "Need 5000 units of widgets",
+    }
+    r = requests.post(f"{API}/quotes", data=data, timeout=30)
+    assert r.status_code == 200, r.text
+    j = r.json()
+    assert j.get("ok") is True
+    assert "id" in j
+
+
+def test_quote_create_requires_name_email():
+    # Missing name -> 422 (FastAPI Form validation)
+    r = requests.post(f"{API}/quotes", data={"email": "x@x.com"}, timeout=30)
+    assert r.status_code == 422
+    r = requests.post(f"{API}/quotes", data={"name": "n"}, timeout=30)
+    assert r.status_code == 422
+
+
+def test_quote_create_with_images_and_admin_flow(auth):
+    name = f"TEST_QImg_{uuid.uuid4().hex[:6]}"
+    data = {"name": name, "email": "img@example.com", "company": "C", "phone": "1",
+            "destination": "LA", "description": "with images"}
+    files = [
+        ("images", ("a.png", io.BytesIO(PNG_BYTES), "image/png")),
+        ("images", ("b.png", io.BytesIO(PNG_BYTES), "image/png")),
+    ]
+    r = requests.post(f"{API}/quotes", data=data, files=files, timeout=60)
+    assert r.status_code == 200, r.text
+    qid = r.json()["id"]
+
+    # List (auth) and find our quote
+    r = requests.get(f"{API}/quotes", headers=auth, timeout=30)
+    assert r.status_code == 200
+    quotes = r.json()
+    mine = [q for q in quotes if q.get("id") == qid]
+    assert mine, "created quote missing from list"
+    q = mine[0]
+    assert q["name"] == name
+    assert q["status"] == "new"
+    assert isinstance(q.get("images"), list) and len(q["images"]) == 2
+    # image url loads
+    img_url = q["images"][0]
+    assert img_url.startswith("/api/files/") and img_url.endswith("/raw")
+    r_img = requests.get(f"{BASE_URL}{img_url}", timeout=30)
+    assert r_img.status_code == 200
+    assert r_img.headers.get("content-type", "").startswith("image/")
+
+    # PUT status to reviewing
+    r = requests.put(f"{API}/quotes/{qid}", headers=auth, json={"status": "reviewing"}, timeout=30)
+    assert r.status_code == 200
+    assert r.json()["status"] == "reviewing"
+
+    # Verify persistence via GET list
+    r = requests.get(f"{API}/quotes", headers=auth, timeout=30)
+    q2 = [x for x in r.json() if x["id"] == qid][0]
+    assert q2["status"] == "reviewing"
+
+    # DELETE
+    r = requests.delete(f"{API}/quotes/{qid}", headers=auth, timeout=30)
+    assert r.status_code == 200
+
+    r = requests.get(f"{API}/quotes", headers=auth, timeout=30)
+    assert not any(x["id"] == qid for x in r.json())
+
+
+def test_quotes_list_requires_auth():
+    r = requests.get(f"{API}/quotes", timeout=30)
+    assert r.status_code == 401
+
+
+def test_analytics_overview_has_quote_counts(auth):
+    r = requests.get(f"{API}/analytics/overview", headers=auth, timeout=30)
+    assert r.status_code == 200
+    d = r.json()
+    assert "total_quotes" in d
+    assert "new_quotes" in d
+    assert isinstance(d["total_quotes"], int)
+    assert isinstance(d["new_quotes"], int)

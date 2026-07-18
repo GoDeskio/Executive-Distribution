@@ -1,20 +1,21 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, X, Users, Globe, FileText, Upload, Download, Building2, Mail, Phone } from "lucide-react";
+import { Plus, Trash2, X, Users, Globe, FileText, Upload, Download, Building2, Mail, Phone, Inbox, MapPin } from "lucide-react";
 import api, { fileUrl, formatApiError } from "@/lib/api";
 import { AdminHeader } from "./AdminHeader";
 
 const inp = "w-full bg-[#0A0A0B] border border-[#27272A] focus:border-[#4A7C94] outline-none rounded-sm px-3 py-2.5 text-sm transition-colors";
 const STATUS = { lead: "text-[#A1A1AA] bg-[#1A1A1D]", active: "text-emerald-300 bg-emerald-950/40", vip: "text-[#4A7C94] bg-[#4A7C94]/15", inactive: "text-[#71717A] bg-[#121214]" };
+const QSTATUS = { new: "text-amber-300 bg-amber-950/40", reviewing: "text-[#4A7C94] bg-[#4A7C94]/15", quoted: "text-emerald-300 bg-emerald-950/40", closed: "text-[#71717A] bg-[#121214]" };
 
 export default function CRM() {
-  const [tab, setTab] = useState("clients");
+  const [tab, setTab] = useState("requests");
   return (
     <div>
-      <AdminHeader title="CRM" subtitle="Clients, visitors & documents" />
+      <AdminHeader title="CRM" subtitle="Quote requests, clients, visitors & documents" />
       <div className="px-8 pt-6">
         <div className="flex gap-1 border-b border-[#27272A]">
-          {[["clients", "Clients", Users], ["visitors", "Visitors", Globe], ["documents", "Documents", FileText]].map(([k, l, Icon]) => (
+          {[["requests", "Quote Requests", Inbox], ["clients", "Clients", Users], ["visitors", "Visitors", Globe], ["documents", "Documents", FileText]].map(([k, l, Icon]) => (
             <button key={k} data-testid={`crm-tab-${k}`} onClick={() => setTab(k)}
               className={`flex items-center gap-2 px-5 py-3 text-sm border-b-2 -mb-px transition-colors ${tab === k ? "border-[#4A7C94] text-[#4A7C94]" : "border-transparent text-[#A1A1AA] hover:text-white"}`}>
               <Icon size={15} /> {l}
@@ -23,12 +24,93 @@ export default function CRM() {
         </div>
       </div>
       <div className="p-8">
+        {tab === "requests" && <Requests />}
         {tab === "clients" && <Clients />}
         {tab === "visitors" && <Visitors />}
         {tab === "documents" && <Documents />}
       </div>
     </div>
   );
+}
+
+function Requests() {
+  const [quotes, setQuotes] = useState([]);
+  const load = () => api.get("/quotes").then((r) => setQuotes(r.data)).catch(() => {});
+  useEffect(() => { load(); }, []);
+
+  const setStatus = async (id, status) => {
+    await api.put(`/quotes/${id}`, { status });
+    setQuotes((q) => q.map((x) => (x.id === id ? { ...x, status } : x)));
+    toast.success("Status updated");
+  };
+  const remove = async (id) => { if (!window.confirm("Delete this request?")) return; await api.delete(`/quotes/${id}`); load(); toast.success("Deleted"); };
+  const convert = async (q) => {
+    await api.post("/clients", { name: q.name, company: q.company, email: q.email, phone: q.phone, status: "lead", value: 0, tags: ["from-quote"], notes: `Destination: ${q.destination}\n\n${q.description}` });
+    await api.put(`/quotes/${q.id}`, { status: "quoted" });
+    load();
+    toast.success("Added to Clients pipeline");
+  };
+
+  if (quotes.length === 0)
+    return <div className="bg-[#121214] border border-[#27272A] rounded-md p-16 text-center text-[#71717A]">
+      <Inbox size={40} className="mx-auto mb-4 opacity-50" /><p>No quote requests yet. Submissions from the website "Request a Quote" form appear here.</p>
+    </div>;
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      {quotes.map((q) => (
+        <div key={q.id} data-testid={`quote-card-${q.id}`} className="bg-[#121214] border border-[#27272A] rounded-md p-6">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <div className="flex items-center gap-3">
+                <h3 className="font-display text-lg">{q.name}</h3>
+                <span className={`px-2 py-0.5 rounded-sm text-xs ${QSTATUS[q.status] || QSTATUS.new}`}>{q.status}</span>
+              </div>
+              <div className="text-xs text-[#71717A] mt-1">{q.created_at ? new Date(q.created_at).toLocaleString() : ""}</div>
+            </div>
+            <button data-testid={`delete-quote-${q.id}`} onClick={() => remove(q.id)} className="text-[#71717A] hover:text-red-400"><Trash2 size={16} /></button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-4">
+            <Info icon={Mail} value={q.email} />
+            {q.company && <Info icon={Building2} value={q.company} />}
+            {q.phone && <Info icon={Phone} value={q.phone} />}
+            {q.destination && <Info icon={MapPin} value={q.destination} />}
+          </div>
+
+          {q.description && (
+            <div className="bg-[#0A0A0B] border border-[#27272A] rounded-sm p-4 text-sm text-[#A1A1AA] mb-4 whitespace-pre-line">{q.description}</div>
+          )}
+
+          {q.images?.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-4">
+              {q.images.map((img, i) => (
+                <a key={i} href={fileUrl(img)} target="_blank" rel="noreferrer"
+                  className="h-16 w-16 rounded-sm overflow-hidden border border-[#27272A] hover:border-[#4A7C94] transition-colors">
+                  <img src={fileUrl(img)} alt="" className="h-full w-full object-cover" />
+                </a>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 pt-4 border-t border-[#27272A]">
+            <select data-testid={`quote-status-${q.id}`} value={q.status} onChange={(e) => setStatus(q.id, e.target.value)}
+              className="bg-[#0A0A0B] border border-[#27272A] rounded-sm px-3 py-2 text-xs outline-none focus:border-[#4A7C94]">
+              <option value="new">New</option><option value="reviewing">Reviewing</option><option value="quoted">Quoted</option><option value="closed">Closed</option>
+            </select>
+            <button data-testid={`convert-quote-${q.id}`} onClick={() => convert(q)}
+              className="ml-auto text-xs bg-[#4A7C94] hover:bg-[#5A8CA4] text-white px-3 py-2 rounded-sm transition-colors flex items-center gap-1">
+              <Users size={13} /> Add to Clients
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Info({ icon: Icon, value }) {
+  return <div className="flex items-center gap-2 text-[#A1A1AA] min-w-0"><Icon size={14} className="text-[#4A7C94] shrink-0" /><span className="truncate">{value}</span></div>;
 }
 
 function Clients() {
