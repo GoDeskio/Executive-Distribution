@@ -7,6 +7,7 @@ from core.db import db
 from core.config import ALL_PERMS
 from core.security import require_superadmin, hash_password
 from core.utils import clean, now_iso
+from core.audit import log_action
 
 router = APIRouter(prefix="/api")
 
@@ -48,7 +49,9 @@ async def create_user(data: UserCreate, user: dict = Depends(require_superadmin)
     doc = {"email": email, "password_hash": hash_password(data.password), "name": data.name or email.split("@")[0],
            "role": "subadmin", "permissions": perms, "active": True, "avatar_url": "", "created_at": now_iso()}
     res = await db.users.insert_one(doc)
-    return clean(await db.users.find_one({"_id": res.inserted_id}))
+    created = await db.users.find_one({"_id": res.inserted_id})
+    await log_action(user, "create", "user", str(res.inserted_id), email)
+    return clean(created)
 
 
 @router.put("/users/{user_id}")
@@ -67,6 +70,7 @@ async def update_user(user_id: str, data: UserManageUpdate, user: dict = Depends
         updates["active"] = data.active
     if updates:
         await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": updates})
+    await log_action(user, "update", "user", user_id, target.get("email", ""))
     return clean(await db.users.find_one({"_id": ObjectId(user_id)}))
 
 
@@ -76,6 +80,7 @@ async def reset_user_password(user_id: str, data: UserPassword, user: dict = Dep
     if not target or target.get("role") == "superadmin":
         raise HTTPException(status_code=400, detail="Cannot reset this account's password")
     await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": {"password_hash": hash_password(data.password)}})
+    await log_action(user, "password", "user", user_id, target.get("email", ""))
     return {"ok": True}
 
 
@@ -87,4 +92,5 @@ async def delete_user(user_id: str, user: dict = Depends(require_superadmin)):
     if target.get("role") == "superadmin":
         raise HTTPException(status_code=400, detail="Cannot remove a super admin")
     await db.users.delete_one({"_id": ObjectId(user_id)})
+    await log_action(user, "delete", "user", user_id, target.get("email", ""))
     return {"ok": True}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Save, Plus, Trash2, ExternalLink } from "lucide-react";
+import { Save, Plus, Trash2, ExternalLink, Rss } from "lucide-react";
 import api, { formatApiError } from "@/lib/api";
 import { AdminHeader } from "./AdminHeader";
 
@@ -10,6 +10,7 @@ export default function SEO() {
   const [s, setS] = useState(null);
   const [services, setServices] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [pinging, setPinging] = useState(false);
 
   useEffect(() => {
     api.get("/settings").then((r) => setS(r.data)).catch(() => {});
@@ -22,10 +23,22 @@ export default function SEO() {
       await api.put("/settings", {
         seo_title: s.seo_title, seo_description: s.seo_description, seo_keywords: s.seo_keywords,
         site_url: s.site_url || "", page_seo: s.page_seo || [],
+        search_engine_ping_enabled: !!s.search_engine_ping_enabled,
+        indexnow_key: s.indexnow_key || "",
       });
       toast.success("SEO settings saved");
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
     finally { setBusy(false); }
+  };
+
+  const pingNow = async () => {
+    setPinging(true);
+    try {
+      const { data } = await api.post("/seo/ping");
+      const parts = Object.entries(data.results || {}).map(([k, v]) => `${k}: ${v}`).join(" · ");
+      toast.success(`Search engines notified — ${parts}`);
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Ping failed"); }
+    finally { setPinging(false); }
   };
 
   const pages = s?.page_seo || [];
@@ -93,6 +106,26 @@ export default function SEO() {
             </a>
           </div>
           <p className="text-xs text-[#71717A]">Sitemap regenerates automatically from your published services and per-page overrides below.</p>
+        </div>
+
+        {/* Search engine notifications */}
+        <div className="bg-[#121214] border border-[#27272A] rounded-md p-6 space-y-5">
+          <div className="flex items-center gap-2 label-caps"><Rss size={14} /> Search Engine Notifications</div>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" data-testid="seo-autoping" checked={!!s.search_engine_ping_enabled}
+              onChange={(e) => setS({ ...s, search_engine_ping_enabled: e.target.checked })} className="accent-[#4A7C94]" />
+            Auto-notify search engines when services or SEO change (requires a canonical Site URL)
+          </label>
+          <div>
+            <label className="label-caps block mb-2">IndexNow Key <span className="text-[#71717A] normal-case">(optional — enables instant Bing/Yandex indexing)</span></label>
+            <input data-testid="seo-indexnow-key" value={s.indexnow_key || ""} onChange={(e) => setS({ ...s, indexnow_key: e.target.value })} className={inp}
+              placeholder="e.g. a 32-char hex key you generate" />
+            <p className="text-xs text-[#71717A] mt-1">The key file is served automatically at <span className="font-mono">/api/indexnow/&lt;key&gt;.txt</span>. Note: Google &amp; Bing have retired the legacy sitemap-ping endpoints; IndexNow is the current standard.</p>
+          </div>
+          <button data-testid="seo-ping-now" onClick={pingNow} disabled={pinging}
+            className="inline-flex items-center gap-2 border border-[#4A7C94]/60 text-[#4A7C94] hover:bg-[#4A7C94]/10 disabled:opacity-60 rounded-sm px-4 py-2 text-sm transition-colors">
+            <Rss size={14} /> {pinging ? "Notifying…" : "Ping search engines now"}
+          </button>
         </div>
 
         {/* Per-page SEO overrides */}

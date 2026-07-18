@@ -7,6 +7,7 @@ import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { ServiceIcon } from "@/components/site/ServiceIcon";
 import { ChatWidget } from "@/components/site/ChatWidget";
+import { useSeo } from "@/hooks/useSeo";
 
 export default function ServiceDetail() {
   const { slug } = useParams();
@@ -17,13 +18,18 @@ export default function ServiceDetail() {
   useEffect(() => {
     window.scrollTo(0, 0);
     api.get(`/services/${slug}`)
-      .then((r) => {
-        setSvc(r.data);
-        document.title = r.data.meta_title || r.data.title;
-      })
+      .then((r) => setSvc(r.data))
       .catch(() => setNotFound(true));
     api.get("/services").then((r) => setOthers(r.data)).catch(() => {});
   }, [slug]);
+
+  useSeo({
+    title: svc ? (svc.meta_title || svc.title) : undefined,
+    description: svc ? (svc.meta_description || svc.short_description) : undefined,
+    keywords: svc?.keywords,
+    image: svc?.image_url,
+    type: "article",
+  });
 
   if (notFound)
     return (

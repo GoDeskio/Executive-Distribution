@@ -8,6 +8,7 @@ import { Footer } from "@/components/site/Footer";
 import { ServiceIcon } from "@/components/site/ServiceIcon";
 import { QuoteForm } from "@/components/site/QuoteForm";
 import { ChatWidget } from "@/components/site/ChatWidget";
+import { useSeo } from "@/hooks/useSeo";
 
 const fade = {
   hidden: { opacity: 0, y: 30 },
@@ -20,11 +21,19 @@ export default function Home() {
 
   useEffect(() => {
     api.get("/services").then((r) => setServices(r.data)).catch(() => {});
-    api.get("/settings").then((r) => {
-      setS(r.data);
-      if (r.data.seo_title) document.title = r.data.seo_title;
-    }).catch(() => {});
+    api.get("/settings").then((r) => setS(r.data)).catch(() => {});
   }, []);
+
+  const homeOverride = (s.page_seo || []).find((p) => {
+    const path = (p.path || "").replace(/^\/+|\/+$/g, "").toLowerCase();
+    return path === "" || path === "home";
+  });
+  useSeo({
+    title: homeOverride?.title || s.seo_title,
+    description: homeOverride?.description || s.seo_description,
+    keywords: homeOverride?.keywords || s.seo_keywords,
+    image: s.hero_image,
+  });
 
   return (
     <div className="grain">

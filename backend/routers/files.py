@@ -7,6 +7,7 @@ from core.db import db
 from core.config import APP_NAME, MIME_TYPES
 from core.security import require_perm
 from core.utils import clean, now_iso
+from core.audit import log_action
 from storage import put_object, get_object
 
 router = APIRouter(prefix="/api")
@@ -65,4 +66,5 @@ async def serve_file(file_id: str):
 @router.delete("/files/{file_id}")
 async def delete_file(file_id: str, user: dict = Depends(require_perm("storage"))):
     await db.files.update_one({"_id": ObjectId(file_id)}, {"$set": {"is_deleted": True}})
+    await log_action(user, "delete", "file", file_id)
     return {"ok": True}

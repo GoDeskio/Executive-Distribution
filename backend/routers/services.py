@@ -6,6 +6,8 @@ from bson import ObjectId
 from core.db import db
 from core.security import require_perm
 from core.utils import clean, now_iso, slugify
+from core.audit import log_action
+from core.seo_ping import maybe_autoping
 
 router = APIRouter(prefix="/api")
 
@@ -55,6 +57,8 @@ async def create_service(data: ServiceInput, user: dict = Depends(require_perm("
     doc["created_at"] = now_iso()
     doc["updated_at"] = now_iso()
     res = await db.services.insert_one(doc)
+    await log_action(user, "create", "service", str(res.inserted_id), data.title)
+    await maybe_autoping()
     return clean(await db.services.find_one({"_id": res.inserted_id}))
 
 
@@ -63,10 +67,15 @@ async def update_service(service_id: str, data: ServiceInput, user: dict = Depen
     doc = data.model_dump()
     doc["updated_at"] = now_iso()
     await db.services.update_one({"_id": ObjectId(service_id)}, {"$set": doc})
+    await log_action(user, "update", "service", service_id, data.title)
+    await maybe_autoping()
     return clean(await db.services.find_one({"_id": ObjectId(service_id)}))
 
 
 @router.delete("/services/{service_id}")
 async def delete_service(service_id: str, user: dict = Depends(require_perm("services"))):
+    target = await db.services.find_one({"_id": ObjectId(service_id)})
     await db.services.delete_one({"_id": ObjectId(service_id)})
+    await log_action(user, "delete", "service", service_id, (target or {}).get("title", ""))
+    await maybe_autoping()
     return {"ok": True}

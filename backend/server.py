@@ -11,12 +11,12 @@ from core.settings_store import DEFAULT_SERVICES, DEFAULT_SETTINGS
 from storage import init_storage
 
 from routers import (auth, users, services, settings, clients, portal,
-                     notifications, quotes, files, analytics, chat, documents, search)
+                     notifications, quotes, files, analytics, chat, documents, search, audit)
 
 app = FastAPI()
 
 for module in (auth, users, services, settings, clients, portal, notifications,
-               quotes, files, analytics, chat, documents, search):
+               quotes, files, analytics, chat, documents, search, audit):
     app.include_router(module.router)
 
 

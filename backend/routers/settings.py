@@ -1,10 +1,12 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import Response
 
 from core.db import db
-from core.security import require_any_perm
+from core.security import require_any_perm, require_perm
 from core.settings_store import get_settings_doc, resolve_base_url
+from core.seo_ping import ping_now, maybe_autoping
+from core.audit import log_action
 
 router = APIRouter(prefix="/api")
 
@@ -38,9 +40,32 @@ async def update_settings(payload: dict, user: dict = Depends(require_any_perm("
     payload.pop("has_email_key", None)
     payload.pop("has_slack_webhook", None)
     payload.pop("has_stytch_secret", None)
+    seo_touched = any(k in payload for k in ("page_seo", "seo_title", "seo_description", "seo_keywords", "site_url"))
     await db.settings.update_one({"_id": "site"}, {"$set": payload}, upsert=True)
+    await log_action(user, "update", "settings", detail=", ".join(sorted(payload.keys()))[:200])
+    if seo_touched:
+        await maybe_autoping()
     doc = await db.settings.find_one({"_id": "site"})
     return _sanitize_settings(doc)
+
+
+@router.get("/indexnow/{key}.txt")
+async def indexnow_key_file(key: str):
+    settings = await get_settings_doc()
+    configured = (settings.get("indexnow_key") or "").strip()
+    if not configured or key != configured:
+        raise HTTPException(status_code=404, detail="Not found")
+    return Response(content=configured, media_type="text/plain")
+
+
+@router.post("/seo/ping")
+async def seo_ping(request: Request, user: dict = Depends(require_perm("seo"))):
+    settings = await get_settings_doc()
+    base = resolve_base_url(settings, request)
+    key = (settings.get("indexnow_key") or "").strip()
+    results = await ping_now(base, key)
+    await log_action(user, "generate", "settings", detail="search-engine ping")
+    return {"base_url": base, "results": results}
 
 
 @router.get("/sitemap.xml")

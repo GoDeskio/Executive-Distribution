@@ -22,6 +22,7 @@ import Profile from "@/pages/admin/Profile";
 import AiAssistant from "@/pages/admin/AiAssistant";
 import Documents from "@/pages/admin/Documents";
 import Search from "@/pages/admin/Search";
+import AuditLog from "@/pages/admin/AuditLog";
 
 function Tracked() {
   useTracking();
@@ -41,6 +42,7 @@ function Tracked() {
         <Route path="storage" element={<PermGuard perm="storage"><Storage /></PermGuard>} />
         <Route path="seo" element={<PermGuard perm="seo"><SEO /></PermGuard>} />
         <Route path="team" element={<PermGuard superOnly><Team /></PermGuard>} />
+        <Route path="audit" element={<PermGuard superOnly><AuditLog /></PermGuard>} />
         <Route path="settings" element={<PermGuard perm="settings"><Settings /></PermGuard>} />
         <Route path="profile" element={<Profile />} />
       </Route>

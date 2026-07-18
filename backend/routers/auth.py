@@ -9,6 +9,7 @@ from core.security import (verify_password, hash_password, create_access_token,
                            get_current_user)
 from core.utils import clean
 from core.settings_store import get_settings_doc
+from core.audit import log_action
 
 router = APIRouter(prefix="/api")
 
@@ -75,6 +76,8 @@ async def login(data: LoginInput):
     if user.get("failed_attempts") or user.get("locked_until"):
         await db.users.update_one({"_id": user["_id"]}, {"$set": {"failed_attempts": 0, "locked_until": None}})
     token = create_access_token(str(user["_id"]), email)
+    await log_action({"id": str(user["_id"]), "email": email, "name": user.get("name")},
+                     "login", "auth")
     return {"token": token, "user": clean(user)}
 
 

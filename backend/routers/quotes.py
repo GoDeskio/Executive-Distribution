@@ -8,6 +8,7 @@ from core.db import db
 from core.config import APP_NAME, MIME_TYPES
 from core.security import require_perm
 from core.utils import clean, now_iso
+from core.audit import log_action
 from storage import put_object
 
 router = APIRouter(prefix="/api")
@@ -72,10 +73,12 @@ async def update_quote(quote_id: str, data: QuoteUpdate, user: dict = Depends(re
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
     if updates:
         await db.quotes.update_one({"_id": ObjectId(quote_id)}, {"$set": updates})
+    await log_action(user, "update", "quote", quote_id, ", ".join(updates.keys()))
     return clean(await db.quotes.find_one({"_id": ObjectId(quote_id)}))
 
 
 @router.delete("/quotes/{quote_id}")
 async def delete_quote(quote_id: str, user: dict = Depends(require_perm("crm"))):
     await db.quotes.delete_one({"_id": ObjectId(quote_id)})
+    await log_action(user, "delete", "quote", quote_id)
     return {"ok": True}

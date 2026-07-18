@@ -13,6 +13,7 @@ from core.config import APP_NAME
 from core.security import require_perm
 from core.utils import clean, now_iso, logger
 from core.settings_store import get_settings_doc, DEFAULT_FEE_RULES
+from core.audit import log_action
 import ai as ai_helper
 from storage import put_object, get_object
 from pdf_utils import generate_document_pdf
@@ -179,6 +180,7 @@ async def create_document(data: DocumentInput, user: dict = Depends(require_perm
     doc["created_at"] = now_iso()
     doc["pdf_file_id"] = None
     res = await db.documents.insert_one(doc)
+    await log_action(user, "create", "document", str(res.inserted_id), doc.get("number", ""))
     return clean(await db.documents.find_one({"_id": res.inserted_id}))
 
 
@@ -186,12 +188,14 @@ async def create_document(data: DocumentInput, user: dict = Depends(require_perm
 async def update_document(doc_id: str, data: DocumentInput, user: dict = Depends(require_perm("documents"))):
     doc = data.model_dump()
     await db.documents.update_one({"_id": ObjectId(doc_id)}, {"$set": doc})
+    await log_action(user, "update", "document", doc_id)
     return clean(await db.documents.find_one({"_id": ObjectId(doc_id)}))
 
 
 @router.delete("/documents/{doc_id}")
 async def delete_document(doc_id: str, user: dict = Depends(require_perm("documents"))):
     await db.documents.delete_one({"_id": ObjectId(doc_id)})
+    await log_action(user, "delete", "document", doc_id)
     return {"ok": True}
 
 
@@ -199,6 +203,7 @@ async def delete_document(doc_id: str, user: dict = Depends(require_perm("docume
 async def toggle_share(doc_id: str, payload: dict, user: dict = Depends(require_perm("documents"))):
     shared = bool(payload.get("shared", True))
     await db.documents.update_one({"_id": ObjectId(doc_id)}, {"$set": {"shared": shared}})
+    await log_action(user, "share", "document", doc_id, "shared" if shared else "hidden")
     return {"ok": True, "shared": shared}
 
 
@@ -223,4 +228,5 @@ async def generate_document(doc_id: str, user: dict = Depends(require_perm("docu
     fres = await db.files.insert_one(frec)
     await db.documents.update_one({"_id": doc["_id"]},
                                   {"$set": {"pdf_file_id": str(fres.inserted_id), "status": "generated"}})
+    await log_action(user, "generate", "document", str(doc["_id"]), doc.get("number", ""))
     return {"ok": True, "file_id": str(fres.inserted_id), "url": f"/api/files/{str(fres.inserted_id)}/raw"}

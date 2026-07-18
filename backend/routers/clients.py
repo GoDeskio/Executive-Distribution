@@ -8,6 +8,7 @@ from bson import ObjectId
 from core.db import db
 from core.security import require_perm
 from core.utils import clean, now_iso
+from core.audit import log_action
 
 router = APIRouter(prefix="/api")
 
@@ -38,18 +39,22 @@ async def create_client(data: ClientInput, user: dict = Depends(require_perm("cr
     doc = data.model_dump()
     doc["created_at"] = now_iso()
     res = await db.clients.insert_one(doc)
+    await log_action(user, "create", "client", str(res.inserted_id), data.name)
     return clean(await db.clients.find_one({"_id": res.inserted_id}))
 
 
 @router.put("/clients/{client_id}")
 async def update_client(client_id: str, data: ClientInput, user: dict = Depends(require_perm("crm"))):
     await db.clients.update_one({"_id": ObjectId(client_id)}, {"$set": data.model_dump()})
+    await log_action(user, "update", "client", client_id, data.name)
     return clean(await db.clients.find_one({"_id": ObjectId(client_id)}))
 
 
 @router.delete("/clients/{client_id}")
 async def delete_client(client_id: str, user: dict = Depends(require_perm("crm"))):
+    target = await db.clients.find_one({"_id": ObjectId(client_id)})
     await db.clients.delete_one({"_id": ObjectId(client_id)})
+    await log_action(user, "delete", "client", client_id, (target or {}).get("name", ""))
     return {"ok": True}
 
 

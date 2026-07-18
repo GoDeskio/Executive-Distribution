@@ -115,4 +115,6 @@ DEFAULT_SETTINGS = {
     "page_seo": [],
     "lockout_max_attempts": 5,
     "lockout_minutes": 15,
+    "search_engine_ping_enabled": False,
+    "indexnow_key": "",
 }
