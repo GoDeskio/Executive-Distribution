@@ -59,7 +59,7 @@ export function QuoteForm() {
     );
 
   return (
-    <motion.form onSubmit={submit} data-testid="quote-form"
+    <motion.form onSubmit={submit} data-testid="quote-form" noValidate
       initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
       className="bg-[#121214] border border-[#27272A] rounded-md p-8 space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">

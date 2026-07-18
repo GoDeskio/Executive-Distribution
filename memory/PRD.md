@@ -16,15 +16,15 @@ Build a fully dynamic, professional website "Executive Distribution" (Import/Exp
 - Design: `/app/design_guidelines.json` (Playfair Display + Manrope, obsidian + steel blue).
 
 ## Implemented (2026-06)
-- Public site: Hero, stats, dynamic services grid, dynamic service detail pages, about, contact footer.
-- Visitor tracking: pageview/click/scroll events → visitors + events collections.
+- Public site: Hero, stats, dynamic services grid, dynamic service detail pages, about, contact.
+- **Request-a-Quote pipeline:** public form (name*, email*, company, phone, shipping destination, description, up to 4 reference images) → stored as quote-request cards in CRM. Admin can set status (new/reviewing/quoted/closed), delete, and convert a request into a Client.
+- Footer admin access is now a small company logo (bottom-right) linking to /login (editable from Settings).
+- Visitor tracking: pageview/click/scroll → visitors + events.
 - Auth: admin login, protected /admin, profile update + password change.
-- Admin dashboard: overview stats, 14-day traffic chart, top pages, click heatmap w/ page selector.
+- Admin dashboard: overview stats incl. New Requests, 14-day traffic chart, top pages, click heatmap.
 - Services: full CRUD + per-service SEO + image upload.
-- CRM: Clients CRUD, Visitors list, Documents upload/list/delete.
-- Object Storage: asset upload grid, copy URL, delete.
-- SEO controls: global meta + search preview + per-service status.
-- Settings: branding (logo upload), hero, about, contact/social — all edit site content.
+- CRM: Quote Requests, Clients CRUD, Visitors list, Documents upload.
+- Object Storage: asset upload grid (logo lives here). SEO controls + Settings (all site content).
 
 ## Test Credentials
 admin@executivedistribution.com / Executive2025!

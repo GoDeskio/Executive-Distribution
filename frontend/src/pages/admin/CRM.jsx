@@ -45,10 +45,14 @@ function Requests() {
   };
   const remove = async (id) => { if (!window.confirm("Delete this request?")) return; await api.delete(`/quotes/${id}`); load(); toast.success("Deleted"); };
   const convert = async (q) => {
-    await api.post("/clients", { name: q.name, company: q.company, email: q.email, phone: q.phone, status: "lead", value: 0, tags: ["from-quote"], notes: `Destination: ${q.destination}\n\n${q.description}` });
-    await api.put(`/quotes/${q.id}`, { status: "quoted" });
-    load();
-    toast.success("Added to Clients pipeline");
+    try {
+      await api.post("/clients", { name: q.name, company: q.company, email: q.email, phone: q.phone, status: "lead", value: 0, tags: ["from-quote"], notes: `Destination: ${q.destination}\n\n${q.description}` });
+      await api.put(`/quotes/${q.id}`, { status: "quoted" });
+      load();
+      toast.success("Added to Clients pipeline");
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Could not convert request");
+    }
   };
 
   if (quotes.length === 0)
