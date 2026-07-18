@@ -16,7 +16,7 @@ export function useTracking() {
 
   useEffect(() => {
     // Do not track admin routes
-    if (location.pathname.startsWith("/admin") || location.pathname === "/login") return;
+    if (location.pathname.startsWith("/admin") || location.pathname === "/login" || location.pathname.startsWith("/portal")) return;
     const session_id = getSessionId();
     const path = location.pathname;
 

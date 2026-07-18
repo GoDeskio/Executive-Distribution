@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, X, Users, Globe, FileText, Upload, Download, Building2, Mail, Phone, Inbox, MapPin } from "lucide-react";
+import { Plus, Trash2, X, Users, Globe, FileText, Upload, Download, Building2, Mail, Phone, Inbox, MapPin, Link2, Copy } from "lucide-react";
 import api, { fileUrl, formatApiError } from "@/lib/api";
 import { AdminHeader } from "./AdminHeader";
 
@@ -137,6 +137,23 @@ function Clients() {
   };
   const remove = async (id) => { if (!window.confirm("Delete client?")) return; await api.delete(`/clients/${id}`); load(); toast.success("Deleted"); };
 
+  const genPortal = async () => {
+    try {
+      const { data } = await api.post(`/clients/${editing.id}/portal-token`);
+      setEditing((p) => ({ ...p, portal_token: data.token }));
+      load();
+      toast.success("Portal link generated");
+    } catch (e) { toast.error("Could not generate link"); }
+  };
+  const revokePortal = async () => {
+    await api.delete(`/clients/${editing.id}/portal-token`);
+    setEditing((p) => ({ ...p, portal_token: "" }));
+    load();
+    toast.success("Portal link revoked");
+  };
+  const portalUrl = editing?.portal_token ? `${window.location.origin}/portal/${editing.portal_token}` : "";
+  const copyPortal = () => { navigator.clipboard.writeText(portalUrl); toast.success("Link copied"); };
+
   return (
     <div>
       <div className="flex justify-end mb-4">
@@ -192,6 +209,27 @@ function Clients() {
                 </select>
               </F>
               <F l="Notes"><textarea rows={3} value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} className={inp} /></F>
+
+              {editing.id && (
+                <div className="border-t border-[#27272A] pt-4">
+                  <div className="flex items-center gap-2 label-caps mb-3"><Link2 size={14} /> Client Portal</div>
+                  {editing.portal_token ? (
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <input data-testid="portal-link" readOnly value={portalUrl} className={inp + " font-mono text-xs"} />
+                        <button data-testid="copy-portal" onClick={copyPortal} className="shrink-0 border border-[#27272A] hover:border-[#4A7C94] rounded-sm px-3 transition-colors"><Copy size={15} /></button>
+                      </div>
+                      <div className="flex gap-3 text-xs">
+                        <a href={portalUrl} target="_blank" rel="noreferrer" className="text-[#4A7C94] hover:text-white">Open portal ↗</a>
+                        <button data-testid="revoke-portal" onClick={revokePortal} className="text-[#71717A] hover:text-red-400">Revoke link</button>
+                      </div>
+                      <p className="text-xs text-[#71717A]">Share this private link so the client can view & download their quotes/receipts — no login required.</p>
+                    </div>
+                  ) : (
+                    <button data-testid="gen-portal" onClick={genPortal} className="border border-[#4A7C94]/60 text-[#4A7C94] hover:bg-[#4A7C94]/10 rounded-sm px-4 py-2 text-sm flex items-center gap-2 transition-colors"><Link2 size={15} /> Generate portal link</button>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex gap-3 p-6 border-t border-[#27272A]">
               <button onClick={() => setEditing(null)} className="flex-1 border border-[#27272A] hover:bg-[#1A1A1D] rounded-sm py-2.5 text-sm transition-colors">Cancel</button>

@@ -320,6 +320,49 @@ async def delete_client(client_id: str, user: dict = Depends(get_current_user)):
     return {"ok": True}
 
 
+@api_router.post("/clients/{client_id}/portal-token")
+async def generate_portal_token(client_id: str, user: dict = Depends(get_current_user)):
+    import secrets
+    token = secrets.token_urlsafe(16)
+    res = await db.clients.update_one({"_id": ObjectId(client_id)}, {"$set": {"portal_token": token}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Client not found")
+    return {"token": token}
+
+
+@api_router.delete("/clients/{client_id}/portal-token")
+async def revoke_portal_token(client_id: str, user: dict = Depends(get_current_user)):
+    await db.clients.update_one({"_id": ObjectId(client_id)}, {"$unset": {"portal_token": ""}})
+    return {"ok": True}
+
+
+@api_router.get("/portal/{token}")
+async def client_portal(token: str):
+    client = await db.clients.find_one({"portal_token": token})
+    if not client:
+        raise HTTPException(status_code=404, detail="Portal not found")
+    settings = await _get_settings_doc()
+    cid = str(client["_id"])
+    docs = await db.documents.find({"client_id": cid, "pdf_file_id": {"$ne": None}}).sort("created_at", -1).to_list(500)
+    documents = [{
+        "number": d.get("number"), "doc_type": d.get("doc_type"), "date": d.get("date"),
+        "grand_total": d.get("grand_total", 0), "port": d.get("port", ""),
+        "destination": d.get("destination", ""),
+        "download_url": f"/api/files/{d['pdf_file_id']}/raw",
+    } for d in docs]
+    return {
+        "client": {"name": client.get("name", ""), "company": client.get("company", "")},
+        "company": {
+            "name": settings.get("company_name", "Executive Distribution"),
+            "logo_url": settings.get("logo_url", ""),
+            "tagline": settings.get("tagline", ""),
+            "contact_email": settings.get("contact_email", ""),
+            "phone": settings.get("phone", ""),
+        },
+        "documents": documents,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Quote Requests (public intake -> CRM)
 # ---------------------------------------------------------------------------

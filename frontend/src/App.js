@@ -8,6 +8,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import Home from "@/pages/Home";
 import ServiceDetail from "@/pages/ServiceDetail";
 import Login from "@/pages/Login";
+import Portal from "@/pages/Portal";
 import AdminLayout from "@/pages/admin/AdminLayout";
 import Dashboard from "@/pages/admin/Dashboard";
 import ServicesAdmin from "@/pages/admin/ServicesAdmin";
@@ -27,6 +28,7 @@ function Tracked() {
       <Route path="/" element={<Home />} />
       <Route path="/services/:slug" element={<ServiceDetail />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/portal/:token" element={<Portal />} />
       <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
         <Route path="ai" element={<AiAssistant />} />

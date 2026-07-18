@@ -1,0 +1,32 @@
+{
+  "summary": "Client Portal feature tested end-to-end (backend + frontend). All 7 pytest cases pass; UI flow (generate/copy/revoke + public portal page unauthenticated + PDF download) verified in a fresh browser context with no ed_token.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "CRM Edit Client modal - Status field", "issues": ["Uses native browser <select> instead of shadcn Select component (inconsistent with rest of UI). Not part of portal feature but visible while testing."]},
+      {"screen": "CRM Edit Client - copy-portal button", "issues": ["navigator.clipboard.writeText rejects in some contexts (NotAllowedError) which surfaces as an Uncaught runtime error overlay in dev. The success toast 'Link copied' still shows but the unhandled rejection should be caught. Consider try/catch + document.execCommand('copy') fallback."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_client_portal.py",
+    "/app/test_reports/pytest/portal_results.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: wrap copy-portal navigator.clipboard.writeText in try/catch to avoid unhandled promise rejection in restricted contexts."
+  ],
+  "critical_code_review_comments": [
+    "GET /api/portal/{token} correctly public, only returns that client's docs with pdf_file_id, excludes _id — good.",
+    "ClientInput schema ignores portal_token so PUT /clients/{id} preserves it — verified.",
+    "Portal PDF download URL /api/files/{id}/raw is also publicly reachable (no auth) which is required for portal but ensure this endpoint stays scoped — currently only reachable if the client knows the file id, which is only exposed through the portal token response. Acceptable but worth noting."
+  ],
+  "updated_files": ["/app/backend/tests/test_client_portal.py"],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100% (all portal flows verified)"},
+  "test_credentials": "admin@executivedistribution.com / Executive2025!",
+  "seed_data_creation": "Reused existing 'TEST_UI Client' (with existing quote EXD-Q-00003 and generated PDF). Portal token generated and then revoked to leave state clean. Backend tests create/delete their own TEST_ clients and documents.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "test_client_portal.py covers full portal lifecycle (gen/revoke/public GET/isolation/persist across PUT/invalid token 404 + document PDF end-to-end). Uses /api/documents/{id}/generate (not /generate-pdf) and auth response key is 'token' (not access_token). Frontend nav: sidebar 'CRM' -> tab 'Clients' -> row click opens 'Edit Client' modal with Client Portal section (gen-portal/portal-link/copy-portal/revoke-portal testids). Public portal renders correctly in a fresh context without ed_token; PDF is served publicly at /api/files/{id}/raw.",
+  "rca of the issue": "N/A - no bugs blocking the feature."
+}
