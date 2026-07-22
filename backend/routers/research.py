@@ -133,3 +133,43 @@ async def summarize_research(research_id: str, user: dict = Depends(require_perm
                                  {"$set": {"ai_summary": summary, "ai_summary_at": now_iso()}})
     await log_action(user, "generate", "research", research_id, "AI summary")
     return {"ok": True, "ai_summary": summary}
+
+
+@router.post("/research/{research_id}/save-contacts")
+async def save_contacts(research_id: str, user: dict = Depends(require_perm("crm"))):
+    if not ObjectId.is_valid(research_id):
+        raise HTTPException(status_code=404, detail="Not found")
+    doc = await db.research.find_one({"_id": ObjectId(research_id)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Research run not found")
+
+    # Map each email to the page it was found on (for company/notes context).
+    email_ctx = {}
+    for r in doc.get("results", []):
+        if r.get("status") != "ok":
+            continue
+        phone = (r.get("phones") or [None])[0]
+        for em in r.get("emails", []):
+            email_ctx.setdefault(em.lower(), {"url": r.get("url", ""), "title": r.get("title", ""), "phone": phone})
+
+    created, skipped = 0, 0
+    for email, ctx in email_ctx.items():
+        if await db.clients.find_one({"email": email}):
+            skipped += 1
+            continue
+        domain = email.split("@")[-1]
+        await db.clients.insert_one({
+            "name": ctx["title"] or domain,
+            "company": ctx["title"] or domain,
+            "email": email,
+            "phone": ctx.get("phone") or "",
+            "status": "lead",
+            "value": 0,
+            "tags": ["research"],
+            "notes": f"Imported from Research on {ctx['url']}",
+            "created_at": now_iso(),
+        })
+        created += 1
+
+    await log_action(user, "create", "client", research_id, f"research import: {created} lead(s)")
+    return {"ok": True, "created": created, "skipped": skipped, "found": len(email_ctx)}

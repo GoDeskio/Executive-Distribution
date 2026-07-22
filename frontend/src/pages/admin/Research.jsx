@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { Globe, Search, Trash2, Loader2, Mail, Phone, Link2, FileSearch, ChevronDown, ChevronRight, ExternalLink, Sparkles } from "lucide-react";
 import api, { formatApiError } from "@/lib/api";
 import { AdminHeader } from "./AdminHeader";
+import { useAuth } from "@/context/AuthContext";
 
 const inp = "w-full bg-[#0A0A0B] border border-[#27272A] focus:border-[#4A7C94] outline-none rounded-sm px-3 py-2.5 text-sm transition-colors";
 
