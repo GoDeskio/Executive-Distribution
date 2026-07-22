@@ -62,14 +62,22 @@ def _http_get(url: str):
 
 
 def _scraperapi_get(url: str, api_key: str):
-    try:
-        resp = requests.get("https://api.scraperapi.com",
-                            params={"api_key": api_key, "url": url, "render": "true"}, timeout=70)
-        if resp.status_code != 200:
-            return None, f"ScraperAPI HTTP {resp.status_code}"
-        return resp.text, None
-    except Exception as e:
-        return None, str(e)[:150]
+    last = None
+    for attempt in range(3):
+        try:
+            resp = requests.get("https://api.scraperapi.com",
+                                params={"api_key": api_key, "url": url, "render": "true"}, timeout=70)
+            if resp.status_code == 200:
+                return resp.text, None
+            last = f"ScraperAPI HTTP {resp.status_code}"
+            if resp.status_code in (429, 500, 502, 503):
+                time.sleep(1.2 * (attempt + 1))
+                continue
+            return None, last
+        except Exception as e:
+            last = str(e)[:150]
+            time.sleep(1.0 * (attempt + 1))
+    return None, last or "ScraperAPI request failed"
 
 
 def _parse(html: str, base_url: str, keywords: list):

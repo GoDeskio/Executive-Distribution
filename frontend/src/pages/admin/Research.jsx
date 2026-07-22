@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Globe, Search, Trash2, Loader2, Mail, Phone, Link2, FileSearch, ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
+import { Globe, Search, Trash2, Loader2, Mail, Phone, Link2, FileSearch, ChevronDown, ChevronRight, ExternalLink, Sparkles } from "lucide-react";
 import api, { formatApiError } from "@/lib/api";
 import { AdminHeader } from "./AdminHeader";
 
@@ -88,6 +88,7 @@ export default function Research() {
   const [current, setCurrent] = useState(null);
   const [history, setHistory] = useState([]);
   const [hasKey, setHasKey] = useState(false);
+  const [summarizing, setSummarizing] = useState(false);
 
   const loadHistory = () => api.get("/research").then((r) => setHistory(r.data)).catch(() => {});
   useEffect(() => {
@@ -113,6 +114,18 @@ export default function Research() {
   const del = async (id) => {
     try { await api.delete(`/research/${id}`); if (current?.id === id) setCurrent(null); loadHistory(); toast.success("Deleted"); }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+  };
+
+  const summarize = async () => {
+    if (!current?.id) return;
+    setSummarizing(true);
+    try {
+      const { data } = await api.post(`/research/${current.id}/summarize`);
+      setCurrent({ ...current, ai_summary: data.ai_summary });
+      loadHistory();
+      toast.success("AI brief ready");
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    finally { setSummarizing(false); }
   };
 
   return (
@@ -148,7 +161,19 @@ export default function Research() {
 
           {current && (
             <div className="space-y-3" data-testid="research-results">
-              <div className="label-caps">Results · {current.ok_count}/{current.urls.length} ok · {current.total_matches} matches</div>
+              <div className="flex items-center justify-between">
+                <div className="label-caps">Results · {current.ok_count}/{current.urls.length} ok · {current.total_matches} matches</div>
+                <button data-testid="research-summarize" onClick={summarize} disabled={summarizing}
+                  className="inline-flex items-center gap-2 bg-[#4A7C94] hover:bg-[#5A8CA4] disabled:opacity-60 text-white px-3 py-1.5 rounded-sm text-xs transition-colors">
+                  {summarizing ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />} {summarizing ? "Analyzing…" : (current.ai_summary ? "Regenerate AI brief" : "AI brief")}
+                </button>
+              </div>
+              {current.ai_summary && (
+                <div data-testid="research-ai-summary" className="bg-[#4A7C94]/10 border border-[#4A7C94]/30 rounded-sm p-4">
+                  <div className="flex items-center gap-2 label-caps mb-2 text-[#8FB4C6]"><Sparkles size={13} /> AI Sourcing Brief</div>
+                  <div className="text-sm text-[#D4D4D8] whitespace-pre-line leading-relaxed">{current.ai_summary}</div>
+                </div>
+              )}
               {current.results.map((r, i) => <ResultCard key={i} r={r} />)}
             </div>
           )}
