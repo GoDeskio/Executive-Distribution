@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, X, Users, Globe, FileText, Upload, Download, Building2, Mail, Phone, Inbox, MapPin, Link2, Copy, Flame } from "lucide-react";
+import { Plus, Trash2, X, Users, Globe, FileText, Upload, Download, Building2, Mail, Phone, Inbox, MapPin, Link2, Copy, Flame, ArrowUpDown, ArrowDown } from "lucide-react";
 import api, { fileUrl, formatApiError } from "@/lib/api";
 import { AdminHeader } from "./AdminHeader";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -128,6 +128,7 @@ function Clients() {
   const [threshold, setThreshold] = useState(5);
   const [bulkStatus, setBulkStatus] = useState("");
   const [bulkTag, setBulkTag] = useState("");
+  const [sortByScore, setSortByScore] = useState(false);
   const EMPTY = { name: "", company: "", email: "", phone: "", status: "lead", value: 0, tags: [], notes: "" };
 
   const load = () => api.get("/clients").then((r) => setClients(r.data)).catch(() => {});
@@ -151,10 +152,18 @@ function Clients() {
       setSelectedIds(new Set()); setBulkStatus(""); setBulkTag(""); load();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
+  const runBulkDelete = async () => {
+    if (!window.confirm(`Delete ${selectedIds.size} selected lead(s)? This cannot be undone.`)) return;
+    try {
+      const { data } = await api.post("/clients/bulk-delete", { ids: [...selectedIds] });
+      toast.success(`Deleted ${data.deleted} lead${data.deleted === 1 ? "" : "s"}`);
+      setSelectedIds(new Set()); load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+  };
 
   const allTags = [...new Set(clients.flatMap((c) => c.tags || []))].sort();
   let filtered = activeTag ? clients.filter((c) => (c.tags || []).includes(activeTag)) : clients;
-  if (activeTag) filtered = [...filtered].sort((a, b) => (b.lead_score || 0) - (a.lead_score || 0));
+  if (sortByScore) filtered = [...filtered].sort((a, b) => (b.lead_score || 0) - (a.lead_score || 0));
 
   useEffect(() => {
     if (editing?.id) {
@@ -249,6 +258,8 @@ function Clients() {
             className="bg-[#0A0A0B] border border-[#27272A] focus:border-[#4A7C94] outline-none rounded-sm px-3 py-1.5 text-sm w-40" />
           <button data-testid="crm-bulk-apply" onClick={runBulk}
             className="bg-[#4A7C94] hover:bg-[#5A8CA4] text-white px-4 py-1.5 rounded-sm text-sm transition-colors">Apply</button>
+          <button data-testid="crm-bulk-delete" onClick={runBulkDelete}
+            className="inline-flex items-center gap-1.5 border border-red-900/50 text-red-400 hover:bg-red-950/30 px-3 py-1.5 rounded-sm text-sm transition-colors"><Trash2 size={14} /> Delete</button>
           <button data-testid="crm-bulk-clear" onClick={() => setSelectedIds(new Set())} className="text-xs text-[#71717A] hover:text-white ml-auto">Clear selection</button>
         </div>
       )}
@@ -259,7 +270,14 @@ function Clients() {
             <tr className="border-b border-[#27272A] text-left text-[#71717A] text-xs uppercase tracking-wide">
               <th className="px-4 py-4 w-10"><input type="checkbox" data-testid="crm-select-all" className="accent-[#4A7C94]" checked={filtered.length > 0 && filtered.every((c) => selectedIds.has(c.id))} onChange={() => toggleAll(filtered.map((c) => c.id))} /></th>
               <th className="px-6 py-4">Name</th><th className="px-6 py-4">Company</th><th className="px-6 py-4">Contact</th>
-              <th className="px-6 py-4">Tags</th><th className="px-6 py-4">Score</th>
+              <th className="px-6 py-4">Tags</th>
+              <th className="px-6 py-4">
+                <button data-testid="crm-sort-score" onClick={() => setSortByScore((v) => !v)}
+                  className={`inline-flex items-center gap-1 uppercase tracking-wide hover:text-[#4A7C94] transition-colors ${sortByScore ? "text-[#4A7C94]" : ""}`}
+                  title="Sort by lead score">
+                  Score {sortByScore ? <ArrowDown size={12} /> : <ArrowUpDown size={12} className="opacity-60" />}
+                </button>
+              </th>
               <th className="px-6 py-4">Status</th><th className="px-6 py-4">Value</th><th className="px-6 py-4"></th>
             </tr>
           </thead>
