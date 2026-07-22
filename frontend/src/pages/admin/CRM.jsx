@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, X, Users, Globe, FileText, Upload, Download, Building2, Mail, Phone, Inbox, MapPin, Link2, Copy } from "lucide-react";
+import { Plus, Trash2, X, Users, Globe, FileText, Upload, Download, Building2, Mail, Phone, Inbox, MapPin, Link2, Copy, Flame } from "lucide-react";
 import api, { fileUrl, formatApiError } from "@/lib/api";
 import { AdminHeader } from "./AdminHeader";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -123,10 +123,15 @@ function Clients() {
   const [editing, setEditing] = useState(null);
   const [portalExpiry, setPortalExpiry] = useState("");
   const [clientDocs, setClientDocs] = useState([]);
+  const [activeTag, setActiveTag] = useState("");
   const EMPTY = { name: "", company: "", email: "", phone: "", status: "lead", value: 0, tags: [], notes: "" };
 
   const load = () => api.get("/clients").then((r) => setClients(r.data)).catch(() => {});
   useEffect(() => { load(); }, []);
+
+  const allTags = [...new Set(clients.flatMap((c) => c.tags || []))].sort();
+  let filtered = activeTag ? clients.filter((c) => (c.tags || []).includes(activeTag)) : clients;
+  if (activeTag) filtered = [...filtered].sort((a, b) => (b.lead_score || 0) - (a.lead_score || 0));
 
   useEffect(() => {
     if (editing?.id) {
@@ -171,7 +176,24 @@ function Clients() {
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
+      <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+        {allTags.length > 0 ? (
+          <div className="flex items-center gap-2 flex-wrap" data-testid="crm-tag-filter">
+            <button data-testid="crm-tag-all" onClick={() => setActiveTag("")}
+              className={`px-3 py-1 rounded-full text-xs border transition-colors ${!activeTag ? "border-[#4A7C94] text-[#4A7C94] bg-[#4A7C94]/10" : "border-[#27272A] text-[#A1A1AA] hover:text-white"}`}>
+              All ({clients.length})
+            </button>
+            {allTags.map((t) => {
+              const n = clients.filter((c) => (c.tags || []).includes(t)).length;
+              return (
+                <button key={t} data-testid={`crm-tag-${t}`} onClick={() => setActiveTag(activeTag === t ? "" : t)}
+                  className={`px-3 py-1 rounded-full text-xs border transition-colors ${activeTag === t ? "border-[#4A7C94] text-[#4A7C94] bg-[#4A7C94]/10" : "border-[#27272A] text-[#A1A1AA] hover:text-white"}`}>
+                  {t} ({n})
+                </button>
+              );
+            })}
+          </div>
+        ) : <div />}
         <button data-testid="new-client-btn" onClick={() => setEditing({ ...EMPTY })}
           className="bg-[#4A7C94] hover:bg-[#5A8CA4] text-white px-4 py-2 rounded-sm text-sm font-medium flex items-center gap-2 transition-colors">
           <Plus size={16} /> Add Client
@@ -182,16 +204,29 @@ function Clients() {
           <thead>
             <tr className="border-b border-[#27272A] text-left text-[#71717A] text-xs uppercase tracking-wide">
               <th className="px-6 py-4">Name</th><th className="px-6 py-4">Company</th><th className="px-6 py-4">Contact</th>
+              <th className="px-6 py-4">Tags</th><th className="px-6 py-4">Score</th>
               <th className="px-6 py-4">Status</th><th className="px-6 py-4">Value</th><th className="px-6 py-4"></th>
             </tr>
           </thead>
           <tbody>
-            {clients.length === 0 && <tr><td colSpan={6} className="px-6 py-10 text-center text-[#71717A]">No clients yet.</td></tr>}
-            {clients.map((c) => (
+            {filtered.length === 0 && <tr><td colSpan={8} className="px-6 py-10 text-center text-[#71717A]">No clients{activeTag ? ` tagged "${activeTag}"` : " yet"}.</td></tr>}
+            {filtered.map((c) => (
               <tr key={c.id} data-testid={`client-row-${c.id}`} className="border-b border-[#27272A]/60 hover:bg-[#1A1A1D]/40 cursor-pointer" onClick={() => setEditing({ ...c })}>
                 <td className="px-6 py-4 font-medium">{c.name}</td>
                 <td className="px-6 py-4 text-[#A1A1AA]">{c.company || "—"}</td>
                 <td className="px-6 py-4 text-[#A1A1AA]">{c.email || c.phone || "—"}</td>
+                <td className="px-6 py-4">
+                  <div className="flex flex-wrap gap-1">
+                    {(c.tags || []).length === 0 ? <span className="text-[#71717A]">—</span> :
+                      (c.tags || []).map((t) => (
+                        <span key={t} onClick={(e) => { e.stopPropagation(); setActiveTag(t); }}
+                          className="px-1.5 py-0.5 rounded-sm text-[10px] bg-[#1A1A1D] text-[#A1A1AA] hover:text-[#4A7C94]">{t}</span>
+                      ))}
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  {c.lead_score ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs text-[#4A7C94] bg-[#4A7C94]/15" title="Keyword matches on source page"><Flame size={11} /> {c.lead_score}</span> : <span className="text-[#71717A]">—</span>}
+                </td>
                 <td className="px-6 py-4"><span className={`px-2 py-1 rounded-sm text-xs ${STATUS[c.status] || STATUS.lead}`}>{c.status}</span></td>
                 <td className="px-6 py-4">${(c.value || 0).toLocaleString()}</td>
                 <td className="px-6 py-4 text-right"><button data-testid={`delete-client-${c.id}`} onClick={(e) => { e.stopPropagation(); remove(c.id); }} className="text-[#71717A] hover:text-red-400"><Trash2 size={15} /></button></td>

@@ -34,8 +34,10 @@ async def _import_contacts(results: list, emails_subset=None, extra_tags=None):
         if r.get("status") != "ok":
             continue
         phone = (r.get("phones") or [None])[0]
+        score = int(r.get("total_matches", 0) or 0)
         for em in r.get("emails", []):
-            email_ctx.setdefault(em.lower(), {"url": r.get("url", ""), "title": r.get("title", ""), "phone": phone})
+            email_ctx.setdefault(em.lower(), {"url": r.get("url", ""), "title": r.get("title", ""),
+                                              "phone": phone, "score": score})
     if emails_subset is not None:
         selected = {e.lower() for e in emails_subset}
         email_ctx = {e: c for e, c in email_ctx.items() if e in selected}
@@ -48,6 +50,8 @@ async def _import_contacts(results: list, emails_subset=None, extra_tags=None):
             updates = {}
             if ctx.get("phone") and not (existing.get("phone") or "").strip():
                 updates["phone"] = ctx["phone"]
+            if ctx.get("score", 0) > int(existing.get("lead_score", 0) or 0):
+                updates["lead_score"] = ctx["score"]
             note = f"Imported from Research on {ctx['url']}"
             prev = existing.get("notes") or ""
             if note not in prev:
@@ -69,6 +73,7 @@ async def _import_contacts(results: list, emails_subset=None, extra_tags=None):
             "status": "lead",
             "value": 0,
             "tags": all_tags,
+            "lead_score": ctx.get("score", 0),
             "notes": f"Imported from Research on {ctx['url']}",
             "created_at": now_iso(),
         })
