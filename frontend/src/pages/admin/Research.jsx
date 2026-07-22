@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Globe, Search, Trash2, Loader2, Mail, Phone, Link2, FileSearch, ChevronDown, ChevronRight, ExternalLink, Sparkles } from "lucide-react";
+import { Globe, Search, Trash2, Loader2, Mail, Phone, Link2, FileSearch, ChevronDown, ChevronRight, ExternalLink, Sparkles, UserPlus } from "lucide-react";
 import api, { formatApiError } from "@/lib/api";
 import { AdminHeader } from "./AdminHeader";
 import { useAuth } from "@/context/AuthContext";
@@ -90,6 +90,7 @@ export default function Research() {
   const [history, setHistory] = useState([]);
   const [hasKey, setHasKey] = useState(false);
   const [summarizing, setSummarizing] = useState(false);
+  const [savingCrm, setSavingCrm] = useState(false);
 
   const loadHistory = () => api.get("/research").then((r) => setHistory(r.data)).catch(() => {});
   useEffect(() => {
@@ -129,6 +130,26 @@ export default function Research() {
     finally { setSummarizing(false); }
   };
 
+  const emailCount = current?.results?.reduce(
+    (n, r) => n + (r.status === "ok" ? (r.emails?.length || 0) : 0), 0
+  ) || 0;
+
+  const saveToCrm = async () => {
+    if (!current?.id) return;
+    setSavingCrm(true);
+    try {
+      const { data } = await api.post(`/research/${current.id}/save-contacts`);
+      if (data.created > 0) {
+        toast.success(`Added ${data.created} lead${data.created === 1 ? "" : "s"} to CRM${data.skipped ? ` · ${data.skipped} already existed` : ""}`);
+      } else if (data.found > 0) {
+        toast.info(`No new leads — all ${data.found} contact${data.found === 1 ? "" : "s"} already in CRM`);
+      } else {
+        toast.info("No email contacts found to save");
+      }
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    finally { setSavingCrm(false); }
+  };
+
   return (
     <div>
       <AdminHeader title="Research" subtitle="Scrape websites for keywords, contacts & links" />
@@ -164,10 +185,18 @@ export default function Research() {
             <div className="space-y-3" data-testid="research-results">
               <div className="flex items-center justify-between">
                 <div className="label-caps">Results · {current.ok_count}/{current.urls.length} ok · {current.total_matches} matches</div>
-                <button data-testid="research-summarize" onClick={summarize} disabled={summarizing}
-                  className="inline-flex items-center gap-2 bg-[#4A7C94] hover:bg-[#5A8CA4] disabled:opacity-60 text-white px-3 py-1.5 rounded-sm text-xs transition-colors">
-                  {summarizing ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />} {summarizing ? "Analyzing…" : (current.ai_summary ? "Regenerate AI brief" : "AI brief")}
-                </button>
+                <div className="flex items-center gap-2">
+                  {emailCount > 0 && (
+                    <button data-testid="research-save-crm" onClick={saveToCrm} disabled={savingCrm}
+                      className="inline-flex items-center gap-2 border border-[#4A7C94] text-[#8FB4C6] hover:bg-[#4A7C94]/10 disabled:opacity-60 px-3 py-1.5 rounded-sm text-xs transition-colors">
+                      {savingCrm ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />} {savingCrm ? "Saving…" : `Save ${emailCount} to CRM`}
+                    </button>
+                  )}
+                  <button data-testid="research-summarize" onClick={summarize} disabled={summarizing}
+                    className="inline-flex items-center gap-2 bg-[#4A7C94] hover:bg-[#5A8CA4] disabled:opacity-60 text-white px-3 py-1.5 rounded-sm text-xs transition-colors">
+                    {summarizing ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />} {summarizing ? "Analyzing…" : (current.ai_summary ? "Regenerate AI brief" : "AI brief")}
+                  </button>
+                </div>
               </div>
               {current.ai_summary && (
                 <div data-testid="research-ai-summary" className="bg-[#4A7C94]/10 border border-[#4A7C94]/30 rounded-sm p-4">
