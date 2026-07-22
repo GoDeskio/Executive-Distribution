@@ -91,6 +91,8 @@ export default function Research() {
   const [hasKey, setHasKey] = useState(false);
   const [summarizing, setSummarizing] = useState(false);
   const [savingCrm, setSavingCrm] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [selected, setSelected] = useState({});
 
   const loadHistory = () => api.get("/research").then((r) => setHistory(r.data)).catch(() => {});
   useEffect(() => {
@@ -130,22 +132,42 @@ export default function Research() {
     finally { setSummarizing(false); }
   };
 
-  const emailCount = current?.results?.reduce(
-    (n, r) => n + (r.status === "ok" ? (r.emails?.length || 0) : 0), 0
-  ) || 0;
+  const emailContacts = (() => {
+    const map = {};
+    (current?.results || []).forEach((r) => {
+      if (r.status !== "ok") return;
+      const phone = (r.phones || [])[0] || "";
+      (r.emails || []).forEach((em) => {
+        const key = em.toLowerCase();
+        if (!map[key]) map[key] = { email: key, title: r.title || "", url: r.url || "", phone };
+      });
+    });
+    return Object.values(map);
+  })();
+  const emailCount = emailContacts.length;
+
+  const openPicker = () => {
+    const all = {};
+    emailContacts.forEach((c) => { all[c.email] = true; });
+    setSelected(all);
+    setPickerOpen(true);
+  };
+
+  const selectedCount = Object.values(selected).filter(Boolean).length;
 
   const saveToCrm = async () => {
     if (!current?.id) return;
+    const emails = Object.keys(selected).filter((e) => selected[e]);
+    if (emails.length === 0) { toast.error("Select at least one contact"); return; }
     setSavingCrm(true);
     try {
-      const { data } = await api.post(`/research/${current.id}/save-contacts`);
-      if (data.created > 0) {
-        toast.success(`Added ${data.created} lead${data.created === 1 ? "" : "s"} to CRM${data.skipped ? ` · ${data.skipped} already existed` : ""}`);
-      } else if (data.found > 0) {
-        toast.info(`No new leads — all ${data.found} contact${data.found === 1 ? "" : "s"} already in CRM`);
-      } else {
-        toast.info("No email contacts found to save");
-      }
+      const { data } = await api.post(`/research/${current.id}/save-contacts`, { emails });
+      const parts = [];
+      if (data.created) parts.push(`${data.created} new lead${data.created === 1 ? "" : "s"}`);
+      if (data.updated) parts.push(`${data.updated} updated`);
+      if (parts.length) toast.success(`CRM: ${parts.join(" · ")}`);
+      else toast.info("No changes — contacts already up to date in CRM");
+      setPickerOpen(false);
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
     finally { setSavingCrm(false); }
   };
@@ -187,9 +209,9 @@ export default function Research() {
                 <div className="label-caps">Results · {current.ok_count}/{current.urls.length} ok · {current.total_matches} matches</div>
                 <div className="flex items-center gap-2">
                   {emailCount > 0 && (
-                    <button data-testid="research-save-crm" onClick={saveToCrm} disabled={savingCrm}
+                    <button data-testid="research-save-crm" onClick={openPicker}
                       className="inline-flex items-center gap-2 border border-[#4A7C94] text-[#8FB4C6] hover:bg-[#4A7C94]/10 disabled:opacity-60 px-3 py-1.5 rounded-sm text-xs transition-colors">
-                      {savingCrm ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />} {savingCrm ? "Saving…" : `Save ${emailCount} to CRM`}
+                      <UserPlus size={13} /> Save {emailCount} to CRM
                     </button>
                   )}
                   <button data-testid="research-summarize" onClick={summarize} disabled={summarizing}
@@ -230,6 +252,42 @@ export default function Research() {
           )}
         </div>
       </div>
+
+      {pickerOpen && (
+        <div data-testid="crm-picker" className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPickerOpen(false)}>
+          <div className="bg-[#121214] border border-[#27272A] rounded-md w-full max-w-lg max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="p-5 border-b border-[#27272A]">
+              <div className="flex items-center gap-2 label-caps text-[#8FB4C6]"><UserPlus size={14} /> Save contacts to CRM</div>
+              <p className="text-xs text-[#71717A] mt-1">Choose which extracted emails become leads. Existing leads get enriched, not duplicated.</p>
+              <div className="flex gap-3 mt-3 text-xs">
+                <button data-testid="crm-picker-all" onClick={() => setSelected(Object.fromEntries(emailContacts.map((c) => [c.email, true])))} className="text-[#4A7C94] hover:underline">Select all</button>
+                <button data-testid="crm-picker-none" onClick={() => setSelected({})} className="text-[#71717A] hover:underline">Clear</button>
+              </div>
+            </div>
+            <div className="p-3 overflow-auto space-y-1">
+              {emailContacts.map((c) => (
+                <label key={c.email} data-testid={`crm-picker-item-${c.email}`} className="flex items-start gap-3 p-2 rounded-sm hover:bg-[#1A1A1D] cursor-pointer">
+                  <input type="checkbox" className="mt-1 accent-[#4A7C94]" checked={!!selected[c.email]} onChange={(e) => setSelected({ ...selected, [c.email]: e.target.checked })} />
+                  <div className="min-w-0">
+                    <div className="text-sm truncate flex items-center gap-1.5"><Mail size={12} className="text-[#4A7C94] shrink-0" /> {c.email}</div>
+                    <div className="text-xs text-[#71717A] truncate">{c.title || c.url}{c.phone ? ` · ${c.phone}` : ""}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <div className="p-4 border-t border-[#27272A] flex items-center justify-between gap-3">
+              <span className="text-xs text-[#71717A]">{selectedCount} selected</span>
+              <div className="flex gap-2">
+                <button onClick={() => setPickerOpen(false)} className="text-sm text-[#A1A1AA] hover:text-white px-4 py-2">Cancel</button>
+                <button data-testid="crm-picker-save" onClick={saveToCrm} disabled={savingCrm || selectedCount === 0}
+                  className="inline-flex items-center gap-2 bg-[#4A7C94] hover:bg-[#5A8CA4] disabled:opacity-60 text-white px-4 py-2 rounded-sm text-sm transition-colors">
+                  {savingCrm ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />} {savingCrm ? "Saving…" : `Save ${selectedCount} to CRM`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

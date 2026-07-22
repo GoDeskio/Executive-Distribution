@@ -135,8 +135,13 @@ async def summarize_research(research_id: str, user: dict = Depends(require_perm
     return {"ok": True, "ai_summary": summary}
 
 
+class SaveContactsInput(BaseModel):
+    emails: List[str] | None = None  # optional subset to import; None = all found
+
+
 @router.post("/research/{research_id}/save-contacts")
-async def save_contacts(research_id: str, user: dict = Depends(require_perm("crm"))):
+async def save_contacts(research_id: str, data: SaveContactsInput = SaveContactsInput(),
+                        user: dict = Depends(require_perm("crm"))):
     if not ObjectId.is_valid(research_id):
         raise HTTPException(status_code=404, detail="Not found")
     doc = await db.research.find_one({"_id": ObjectId(research_id)})
@@ -152,10 +157,29 @@ async def save_contacts(research_id: str, user: dict = Depends(require_perm("crm
         for em in r.get("emails", []):
             email_ctx.setdefault(em.lower(), {"url": r.get("url", ""), "title": r.get("title", ""), "phone": phone})
 
-    created, skipped = 0, 0
+    # Restrict to the selected subset when provided.
+    if data.emails is not None:
+        selected = {e.lower() for e in data.emails}
+        email_ctx = {e: c for e, c in email_ctx.items() if e in selected}
+
+    created, updated = 0, 0
     for email, ctx in email_ctx.items():
-        if await db.clients.find_one({"email": email}):
-            skipped += 1
+        existing = await db.clients.find_one({"email": email})
+        if existing:
+            # Dedupe: enrich the existing lead instead of skipping it.
+            updates = {}
+            if ctx.get("phone") and not (existing.get("phone") or "").strip():
+                updates["phone"] = ctx["phone"]
+            note = f"Imported from Research on {ctx['url']}"
+            prev = existing.get("notes") or ""
+            if note not in prev:
+                updates["notes"] = (prev + ("\n" if prev else "") + note).strip()
+            tags = existing.get("tags") or []
+            if "research" not in tags:
+                updates["tags"] = tags + ["research"]
+            if updates:
+                await db.clients.update_one({"_id": existing["_id"]}, {"$set": updates})
+                updated += 1
             continue
         domain = email.split("@")[-1]
         await db.clients.insert_one({
@@ -171,5 +195,6 @@ async def save_contacts(research_id: str, user: dict = Depends(require_perm("crm
         })
         created += 1
 
-    await log_action(user, "create", "client", research_id, f"research import: {created} lead(s)")
-    return {"ok": True, "created": created, "skipped": skipped, "found": len(email_ctx)}
+    await log_action(user, "create", "client", research_id,
+                     f"research import: {created} new, {updated} updated")
+    return {"ok": True, "created": created, "updated": updated, "found": len(email_ctx)}
