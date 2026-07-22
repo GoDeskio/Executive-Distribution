@@ -1,5 +1,6 @@
 import re
 import time
+from functools import lru_cache
 from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
 
@@ -23,14 +24,19 @@ def _normalize_ws(text: str) -> str:
     return re.sub(r"\s+", " ", text or "").strip()
 
 
+@lru_cache(maxsize=256)
+def _robots_parser(base: str):
+    rp = RobotFileParser()
+    rp.set_url(urljoin(base, "/robots.txt"))
+    rp.read()
+    return rp
+
+
 def _robots_allows(url: str) -> bool:
     try:
         parsed = urlparse(url)
         base = f"{parsed.scheme}://{parsed.netloc}"
-        rp = RobotFileParser()
-        rp.set_url(urljoin(base, "/robots.txt"))
-        rp.read()
-        return rp.can_fetch(UA, url)
+        return _robots_parser(base).can_fetch(UA, url)
     except Exception:
         return True  # if robots can't be read, don't block
 

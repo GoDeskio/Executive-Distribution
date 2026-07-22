@@ -63,6 +63,10 @@ async def list_research(user: dict = Depends(require_perm("research"))):
 
 @router.delete("/research/{research_id}")
 async def delete_research(research_id: str, user: dict = Depends(require_perm("research"))):
-    await db.research.delete_one({"_id": ObjectId(research_id)})
+    if not ObjectId.is_valid(research_id):
+        raise HTTPException(status_code=404, detail="Not found")
+    res = await db.research.delete_one({"_id": ObjectId(research_id)})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
     await log_action(user, "delete", "research", research_id)
     return {"ok": True}
