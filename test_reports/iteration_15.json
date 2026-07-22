@@ -1,0 +1,23 @@
+{
+  "summary": "Iteration 15: Research (web scraping) backend feature tested end-to-end. All 17 pytest tests passed (100%). Covered: 'research' permission listing, /api/research/scrape success (title/keyword_matches/emails/phones/links/word_count/ok_count/total_matches), RBAC 401/403/allow paths for scrape/list/delete, empty URL 400, render-without-key graceful error (no 500), robots.txt no-crash path, scraperapi_key write-only sanitization (has_scraperapi_key flag), audit entry for entity='research', and regressions (superadmin login, subadmin without 'crm' 403 on /api/clients, sitemap.xml, /api/audit superadmin-only).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter15_research.py",
+    "/app/test_reports/pytest/iter15_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "delete_research does not validate ObjectId; a bad id string will raise bson InvalidId -> 500. Consider try/except returning 404.",
+    "delete_research returns {ok:true} even when nothing was deleted; consider returning 404 when deleted_count==0.",
+    "scraper._robots_allows uses urllib RobotFileParser.read() which is blocking network I/O and adds latency per URL; consider caching per netloc within a request.",
+    "MAX_URLS=15 truncation is silent — clients get no signal that URLs were dropped."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter15_research.py"],
+  "success_rate": {"backend": "100%", "frontend": "not tested (skipped per request)"},
+  "test_credentials": "admin@executivedistribution.com / Executive2025!",
+  "seed_data_creation": "Created and cleaned up throwaway sub-admins (TEST_sub_noperm_*, TEST_sub_research_*) and research docs. scraperapi_key reset to ''.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Research feature fully verified. Test file at /app/backend/tests/test_iter15_research.py can serve as regression. Env loader reads REACT_APP_BACKEND_URL from /app/frontend/.env because pytest env doesn't inject it."
+}

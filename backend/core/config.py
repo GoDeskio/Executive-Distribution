@@ -5,7 +5,7 @@ JWT_ALGORITHM = "HS256"
 APP_NAME = "executive-distribution"
 EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
 
-ALL_PERMS = ["dashboard", "ai", "documents", "services", "crm", "storage", "seo", "settings", "search"]
+ALL_PERMS = ["dashboard", "ai", "documents", "services", "crm", "storage", "seo", "settings", "search", "research"]
 
 MIME_TYPES = {
     "jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "gif": "image/gif",

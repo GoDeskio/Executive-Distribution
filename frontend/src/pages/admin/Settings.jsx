@@ -14,20 +14,22 @@ export default function Settings() {
   const [emailKey, setEmailKey] = useState("");
   const [slackHook, setSlackHook] = useState("");
   const [stytchSecret, setStytchSecret] = useState("");
+  const [scraperApiKey, setScraperApiKey] = useState("");
 
   useEffect(() => { api.get("/settings").then((r) => setS(r.data)).catch(() => {}); }, []);
 
   const save = async () => {
     setBusy(true);
     try {
-      const { seo_title, seo_description, seo_keywords, has_own_key, has_email_key, has_slack_webhook, has_stytch_secret, ...rest } = s;
+      const { seo_title, seo_description, seo_keywords, has_own_key, has_email_key, has_slack_webhook, has_stytch_secret, has_update_token, has_scraperapi_key, ...rest } = s;
       const payload = { ...rest };
       if (ownKey.trim()) payload.ai_own_key = ownKey.trim();
       if (emailKey.trim()) payload.email_api_key = emailKey.trim();
       if (slackHook.trim()) payload.slack_webhook_url = slackHook.trim();
       if (stytchSecret.trim()) payload.stytch_secret = stytchSecret.trim();
+      if (scraperApiKey.trim()) payload.scraperapi_key = scraperApiKey.trim();
       await api.put("/settings", payload);
-      setOwnKey(""); setEmailKey(""); setSlackHook(""); setStytchSecret("");
+      setOwnKey(""); setEmailKey(""); setSlackHook(""); setStytchSecret(""); setScraperApiKey("");
       toast.success("Settings saved");
     }
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
@@ -179,6 +181,14 @@ export default function Settings() {
                   placeholder={s.has_stytch_secret ? "•••••••• (leave blank to keep)" : "secret-live-…"} />
               </div>
             </div>
+          </div>
+
+          <div className="border-t border-[#27272A] pt-5">
+            <div className="text-sm font-medium mb-1">Research — ScraperAPI</div>
+            <p className="text-xs text-[#71717A] mb-3">Optional. Add a ScraperAPI key to enable "Render JavaScript" scraping (headless browser + anti-bot bypass) in the Research tab. The free engine works without a key.</p>
+            <label className="label-caps block mb-2">ScraperAPI Key {s.has_scraperapi_key && <span className="text-xs text-emerald-400">(on file)</span>}</label>
+            <input data-testid="scraperapi-key" type="password" value={scraperApiKey} onChange={(e) => setScraperApiKey(e.target.value)} className={inp}
+              placeholder={s.has_scraperapi_key ? "•••••••• (leave blank to keep)" : "your ScraperAPI key"} />
           </div>
 
           <div className="border-t border-[#27272A] pt-5">

@@ -1,7 +1,7 @@
 import { NavLink, useNavigate, Outlet } from "react-router-dom";
 import {
   LayoutDashboard, Package, Users, HardDrive, Search as SearchIcon, Settings as SettingsIcon,
-  User, LogOut, Ship, Sparkles, FileText, Bell, Shield, ScrollText, AlertTriangle,
+  User, LogOut, Ship, Sparkles, FileText, Bell, Shield, ScrollText, AlertTriangle, Globe,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { fileUrl } from "@/lib/api";
@@ -16,6 +16,7 @@ const NAV = [
   { to: "/admin/services", label: "Services", icon: Package, perm: "services" },
   { to: "/admin/crm", label: "CRM", icon: Users, perm: "crm" },
   { to: "/admin/storage", label: "Object Storage", icon: HardDrive, perm: "storage" },
+  { to: "/admin/research", label: "Research", icon: Globe, perm: "research" },
   { to: "/admin/seo", label: "SEO Controls", icon: SearchIcon, perm: "seo" },
   { to: "/admin/team", label: "Team & Access", icon: Shield, superOnly: true },
   { to: "/admin/audit", label: "Audit Log", icon: ScrollText, superOnly: true },

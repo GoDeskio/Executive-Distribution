@@ -130,4 +130,5 @@ DEFAULT_SETTINGS = {
     "backup_schedule_interval_hours": 24,
     "backup_retention": 7,
     "alert_on_backup": False,
+    "scraperapi_key": "",
 }

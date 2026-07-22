@@ -13,12 +13,12 @@ from core.updater import run_check, run_update_script
 from storage import init_storage
 
 from routers import (auth, users, services, settings, clients, portal,
-                     notifications, quotes, files, analytics, chat, documents, search, audit, updates, backup)
+                     notifications, quotes, files, analytics, chat, documents, search, audit, updates, backup, research)
 
 app = FastAPI()
 
 for module in (auth, users, services, settings, clients, portal, notifications,
-               quotes, files, analytics, chat, documents, search, audit, updates, backup):
+               quotes, files, analytics, chat, documents, search, audit, updates, backup, research):
     app.include_router(module.router)
 
 

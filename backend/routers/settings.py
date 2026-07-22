@@ -28,6 +28,8 @@ def _sanitize_settings(doc: dict) -> dict:
     doc["has_stytch_secret"] = bool(stytch)
     upd = (doc.pop("update_token", "") or "").strip()
     doc["has_update_token"] = bool(upd)
+    sapi = (doc.pop("scraperapi_key", "") or "").strip()
+    doc["has_scraperapi_key"] = bool(sapi)
     return doc
 
 
