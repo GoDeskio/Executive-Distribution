@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, X, Users, Globe, FileText, Upload, Download, Building2, Mail, Phone, Inbox, MapPin, Link2, Copy, Flame, ArrowUpDown, ArrowDown } from "lucide-react";
+import { Plus, Trash2, X, Users, Globe, FileText, Upload, Download, Building2, Mail, Phone, Inbox, MapPin, Link2, Copy, Flame, ArrowUpDown, ArrowDown, Bookmark } from "lucide-react";
 import api, { fileUrl, formatApiError } from "@/lib/api";
 import { AdminHeader } from "./AdminHeader";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -129,6 +129,7 @@ function Clients() {
   const [bulkStatus, setBulkStatus] = useState("");
   const [bulkTag, setBulkTag] = useState("");
   const [sortByScore, setSortByScore] = useState(false);
+  const [savedViews, setSavedViews] = useState(() => { try { return JSON.parse(localStorage.getItem("crm_views") || "[]"); } catch { return []; } });
   const EMPTY = { name: "", company: "", email: "", phone: "", status: "lead", value: 0, tags: [], notes: "" };
 
   const load = () => api.get("/clients").then((r) => setClients(r.data)).catch(() => {});
@@ -160,6 +161,28 @@ function Clients() {
       setSelectedIds(new Set()); load();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
+
+  const exportCsv = () => {
+    const headers = ["Name", "Company", "Email", "Phone", "Status", "Value", "Score", "Tags"];
+    const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const rows = filtered.map((c) => [c.name, c.company, c.email, c.phone, c.status, c.value || 0, c.lead_score || 0, (c.tags || []).join("; ")].map(esc).join(","));
+    const csv = [headers.join(","), ...rows].join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = `clients${activeTag ? "-" + activeTag : ""}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+    toast.success(`Exported ${filtered.length} client${filtered.length === 1 ? "" : "s"}`);
+  };
+
+  const persistViews = (v) => { setSavedViews(v); localStorage.setItem("crm_views", JSON.stringify(v)); };
+  const saveView = () => {
+    const name = window.prompt("Name this view (tag + sort):");
+    if (!name || !name.trim()) return;
+    persistViews([...savedViews.filter((x) => x.name !== name.trim()), { name: name.trim(), tag: activeTag, sort: sortByScore }]);
+    toast.success(`View "${name.trim()}" saved`);
+  };
+  const applyView = (v) => { setActiveTag(v.tag || ""); setSortByScore(!!v.sort); };
+  const deleteView = (name) => persistViews(savedViews.filter((x) => x.name !== name));
 
   const allTags = [...new Set(clients.flatMap((c) => c.tags || []))].sort();
   let filtered = activeTag ? clients.filter((c) => (c.tags || []).includes(activeTag)) : clients;
@@ -227,6 +250,10 @@ function Clients() {
           </div>
         ) : <div />}
         <div className="flex items-center gap-3">
+          <button data-testid="crm-export-csv" onClick={exportCsv}
+            className="inline-flex items-center gap-1.5 border border-[#27272A] hover:border-[#4A7C94] text-[#A1A1AA] hover:text-white px-3 py-2 rounded-sm text-sm transition-colors"><Download size={15} /> Export CSV</button>
+          <button data-testid="crm-save-view" onClick={saveView}
+            className="inline-flex items-center gap-1.5 border border-[#27272A] hover:border-[#4A7C94] text-[#A1A1AA] hover:text-white px-3 py-2 rounded-sm text-sm transition-colors"><Bookmark size={15} /> Save view</button>
           <label className="flex items-center gap-2 text-xs text-[#A1A1AA]" title="Leads scoring at or above this stand out as hot">
             <Flame size={13} className="text-orange-400" /> Hot ≥
             <input data-testid="crm-hot-threshold" type="number" min={0} value={threshold}
@@ -241,6 +268,18 @@ function Clients() {
           </button>
         </div>
       </div>
+
+      {savedViews.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap mb-4" data-testid="crm-saved-views">
+          <span className="text-xs text-[#71717A]"><Bookmark size={12} className="inline mr-1" />Saved views:</span>
+          {savedViews.map((v) => (
+            <span key={v.name} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border border-[#27272A] bg-[#121214]">
+              <button data-testid={`crm-view-${v.name}`} onClick={() => applyView(v)} className="text-[#A1A1AA] hover:text-[#4A7C94]">{v.name}</button>
+              <button data-testid={`crm-view-del-${v.name}`} onClick={() => deleteView(v.name)} className="text-[#71717A] hover:text-red-400"><X size={11} /></button>
+            </span>
+          ))}
+        </div>
+      )}
 
       {selectedIds.size > 0 && (
         <div data-testid="crm-bulk-bar" className="flex items-center gap-3 flex-wrap mb-4 bg-[#4A7C94]/10 border border-[#4A7C94]/30 rounded-sm px-4 py-3">
