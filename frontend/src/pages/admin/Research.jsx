@@ -85,6 +85,9 @@ export default function Research() {
   const [urls, setUrls] = useState("");
   const [render, setRender] = useState(false);
   const [respectRobots, setRespectRobots] = useState(true);
+  const [autoImport, setAutoImport] = useState(false);
+  const [importTag, setImportTag] = useState("");
+  const [pickerTag, setPickerTag] = useState("");
   const [running, setRunning] = useState(false);
   const [current, setCurrent] = useState(null);
   const [history, setHistory] = useState([]);
@@ -107,9 +110,13 @@ export default function Research() {
     try {
       const { data } = await api.post("/research/scrape", {
         keywords, urls: urlList, render, respect_robots: respectRobots,
+        auto_import: autoImport, import_tag: importTag,
       });
       setCurrent(data);
-      toast.success(`Scraped ${data.ok_count}/${data.urls.length} · ${data.total_matches} keyword matches`);
+      let msg = `Scraped ${data.ok_count}/${data.urls.length} · ${data.total_matches} keyword matches`;
+      const s = data.import_summary;
+      if (s && (s.created || s.updated)) msg += ` · CRM: ${s.created} new${s.updated ? `, ${s.updated} updated` : ""}`;
+      toast.success(msg);
       loadHistory();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
     finally { setRunning(false); }
@@ -161,7 +168,8 @@ export default function Research() {
     if (emails.length === 0) { toast.error("Select at least one contact"); return; }
     setSavingCrm(true);
     try {
-      const { data } = await api.post(`/research/${current.id}/save-contacts`, { emails });
+      const tags = pickerTag.trim() ? [pickerTag.trim()] : [];
+      const { data } = await api.post(`/research/${current.id}/save-contacts`, { emails, tags });
       const parts = [];
       if (data.created) parts.push(`${data.created} new lead${data.created === 1 ? "" : "s"}`);
       if (data.updated) parts.push(`${data.updated} updated`);
@@ -196,7 +204,17 @@ export default function Research() {
                 <input type="checkbox" data-testid="research-robots" checked={respectRobots} onChange={(e) => setRespectRobots(e.target.checked)} className="accent-[#4A7C94]" />
                 Respect robots.txt
               </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" data-testid="research-autoimport" checked={autoImport} onChange={(e) => setAutoImport(e.target.checked)} className="accent-[#4A7C94]" />
+                Auto-save contacts to CRM
+              </label>
             </div>
+            {autoImport && (
+              <div>
+                <label className="label-caps block mb-2">Import tag <span className="text-[#71717A] normal-case">(optional — added to every lead)</span></label>
+                <input data-testid="research-import-tag" value={importTag} onChange={(e) => setImportTag(e.target.value)} className={inp} placeholder="e.g. Q3-electronics-campaign" />
+              </div>
+            )}
             <button data-testid="research-run" onClick={run} disabled={running}
               className="bg-[#4A7C94] hover:bg-[#5A8CA4] disabled:opacity-60 text-white px-5 py-2.5 rounded-sm text-sm font-medium flex items-center gap-2 transition-colors">
               {running ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />} {running ? "Scraping…" : "Run research"}
@@ -276,8 +294,12 @@ export default function Research() {
               ))}
             </div>
             <div className="p-4 border-t border-[#27272A] flex items-center justify-between gap-3">
-              <span className="text-xs text-[#71717A]">{selectedCount} selected</span>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <span className="text-xs text-[#71717A] shrink-0">Tag</span>
+                <input data-testid="crm-picker-tag" value={pickerTag} onChange={(e) => setPickerTag(e.target.value)}
+                  className="bg-[#0A0A0B] border border-[#27272A] focus:border-[#4A7C94] outline-none rounded-sm px-2 py-1.5 text-xs w-full max-w-[180px]" placeholder="optional tag" />
+              </div>
+              <div className="flex gap-2 shrink-0">
                 <button onClick={() => setPickerOpen(false)} className="text-sm text-[#A1A1AA] hover:text-white px-4 py-2">Cancel</button>
                 <button data-testid="crm-picker-save" onClick={saveToCrm} disabled={savingCrm || selectedCount === 0}
                   className="inline-flex items-center gap-2 bg-[#4A7C94] hover:bg-[#5A8CA4] disabled:opacity-60 text-white px-4 py-2 rounded-sm text-sm transition-colors">

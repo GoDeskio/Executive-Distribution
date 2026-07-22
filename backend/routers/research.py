@@ -22,6 +22,58 @@ class ScrapeInput(BaseModel):
     urls: List[str] = []
     render: bool = False
     respect_robots: bool = True
+    auto_import: bool = False
+    import_tag: str = ""
+
+
+async def _import_contacts(results: list, emails_subset=None, extra_tags=None):
+    """Turn scraped emails into CRM leads. Enriches existing leads instead of skipping."""
+    extra_tags = [t.strip() for t in (extra_tags or []) if t and t.strip()]
+    email_ctx = {}
+    for r in results:
+        if r.get("status") != "ok":
+            continue
+        phone = (r.get("phones") or [None])[0]
+        for em in r.get("emails", []):
+            email_ctx.setdefault(em.lower(), {"url": r.get("url", ""), "title": r.get("title", ""), "phone": phone})
+    if emails_subset is not None:
+        selected = {e.lower() for e in emails_subset}
+        email_ctx = {e: c for e, c in email_ctx.items() if e in selected}
+
+    all_tags = ["research"] + [t for t in extra_tags if t != "research"]
+    created, updated = 0, 0
+    for email, ctx in email_ctx.items():
+        existing = await db.clients.find_one({"email": email})
+        if existing:
+            updates = {}
+            if ctx.get("phone") and not (existing.get("phone") or "").strip():
+                updates["phone"] = ctx["phone"]
+            note = f"Imported from Research on {ctx['url']}"
+            prev = existing.get("notes") or ""
+            if note not in prev:
+                updates["notes"] = (prev + ("\n" if prev else "") + note).strip()
+            tags = existing.get("tags") or []
+            new_tags = tags + [t for t in all_tags if t not in tags]
+            if new_tags != tags:
+                updates["tags"] = new_tags
+            if updates:
+                await db.clients.update_one({"_id": existing["_id"]}, {"$set": updates})
+                updated += 1
+            continue
+        domain = email.split("@")[-1]
+        await db.clients.insert_one({
+            "name": ctx["title"] or domain,
+            "company": ctx["title"] or domain,
+            "email": email,
+            "phone": ctx.get("phone") or "",
+            "status": "lead",
+            "value": 0,
+            "tags": all_tags,
+            "notes": f"Imported from Research on {ctx['url']}",
+            "created_at": now_iso(),
+        })
+        created += 1
+    return {"created": created, "updated": updated, "found": len(email_ctx)}
 
 
 @router.post("/research/scrape")
@@ -53,7 +105,16 @@ async def research_scrape(data: ScrapeInput, user: dict = Depends(require_perm("
     res = await db.research.insert_one(doc)
     await log_action(user, "generate", "research", str(res.inserted_id),
                      f"{len(urls)} url(s), render={data.render}")
-    return clean(await db.research.find_one({"_id": res.inserted_id}))
+
+    out = clean(await db.research.find_one({"_id": res.inserted_id}))
+    if data.auto_import:
+        tags = [data.import_tag] if data.import_tag.strip() else []
+        summary = await _import_contacts(results, extra_tags=tags)
+        if summary["created"] or summary["updated"]:
+            await log_action(user, "create", "client", str(res.inserted_id),
+                             f"auto-import: {summary['created']} new, {summary['updated']} updated")
+        out["import_summary"] = summary
+    return out
 
 
 @router.get("/research")
@@ -137,6 +198,7 @@ async def summarize_research(research_id: str, user: dict = Depends(require_perm
 
 class SaveContactsInput(BaseModel):
     emails: List[str] | None = None  # optional subset to import; None = all found
+    tags: List[str] = []
 
 
 @router.post("/research/{research_id}/save-contacts")
@@ -148,53 +210,7 @@ async def save_contacts(research_id: str, data: SaveContactsInput = SaveContacts
     if not doc:
         raise HTTPException(status_code=404, detail="Research run not found")
 
-    # Map each email to the page it was found on (for company/notes context).
-    email_ctx = {}
-    for r in doc.get("results", []):
-        if r.get("status") != "ok":
-            continue
-        phone = (r.get("phones") or [None])[0]
-        for em in r.get("emails", []):
-            email_ctx.setdefault(em.lower(), {"url": r.get("url", ""), "title": r.get("title", ""), "phone": phone})
-
-    # Restrict to the selected subset when provided.
-    if data.emails is not None:
-        selected = {e.lower() for e in data.emails}
-        email_ctx = {e: c for e, c in email_ctx.items() if e in selected}
-
-    created, updated = 0, 0
-    for email, ctx in email_ctx.items():
-        existing = await db.clients.find_one({"email": email})
-        if existing:
-            # Dedupe: enrich the existing lead instead of skipping it.
-            updates = {}
-            if ctx.get("phone") and not (existing.get("phone") or "").strip():
-                updates["phone"] = ctx["phone"]
-            note = f"Imported from Research on {ctx['url']}"
-            prev = existing.get("notes") or ""
-            if note not in prev:
-                updates["notes"] = (prev + ("\n" if prev else "") + note).strip()
-            tags = existing.get("tags") or []
-            if "research" not in tags:
-                updates["tags"] = tags + ["research"]
-            if updates:
-                await db.clients.update_one({"_id": existing["_id"]}, {"$set": updates})
-                updated += 1
-            continue
-        domain = email.split("@")[-1]
-        await db.clients.insert_one({
-            "name": ctx["title"] or domain,
-            "company": ctx["title"] or domain,
-            "email": email,
-            "phone": ctx.get("phone") or "",
-            "status": "lead",
-            "value": 0,
-            "tags": ["research"],
-            "notes": f"Imported from Research on {ctx['url']}",
-            "created_at": now_iso(),
-        })
-        created += 1
-
+    summary = await _import_contacts(doc.get("results", []), emails_subset=data.emails, extra_tags=data.tags)
     await log_action(user, "create", "client", research_id,
-                     f"research import: {created} new, {updated} updated")
-    return {"ok": True, "created": created, "updated": updated, "found": len(email_ctx)}
+                     f"research import: {summary['created']} new, {summary['updated']} updated")
+    return {"ok": True, **summary}
