@@ -124,10 +124,33 @@ function Clients() {
   const [portalExpiry, setPortalExpiry] = useState("");
   const [clientDocs, setClientDocs] = useState([]);
   const [activeTag, setActiveTag] = useState("");
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [threshold, setThreshold] = useState(5);
+  const [bulkStatus, setBulkStatus] = useState("");
+  const [bulkTag, setBulkTag] = useState("");
   const EMPTY = { name: "", company: "", email: "", phone: "", status: "lead", value: 0, tags: [], notes: "" };
 
   const load = () => api.get("/clients").then((r) => setClients(r.data)).catch(() => {});
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); api.get("/settings").then((r) => setThreshold(r.data.hot_lead_threshold ?? 5)).catch(() => {}); }, []);
+
+  const isHot = (c) => threshold > 0 && (c.lead_score || 0) >= threshold;
+  const saveThreshold = async (v) => {
+    const n = Math.max(0, Number(v) || 0);
+    setThreshold(n);
+    try { await api.put("/settings", { hot_lead_threshold: n }); toast.success(`Hot-lead threshold set to ${n}`); }
+    catch { toast.error("Could not save threshold"); }
+  };
+
+  const toggleSel = (id) => setSelectedIds((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleAll = (ids) => setSelectedIds((s) => (ids.every((i) => s.has(i)) ? new Set() : new Set(ids)));
+  const runBulk = async () => {
+    if (!bulkStatus && !bulkTag.trim()) { toast.error("Pick a status or enter a tag"); return; }
+    try {
+      const { data } = await api.post("/clients/bulk", { ids: [...selectedIds], status: bulkStatus || null, add_tag: bulkTag.trim() || null });
+      toast.success(`Updated ${data.updated} of ${data.matched} lead${data.matched === 1 ? "" : "s"}`);
+      setSelectedIds(new Set()); setBulkStatus(""); setBulkTag(""); load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+  };
 
   const allTags = [...new Set(clients.flatMap((c) => c.tags || []))].sort();
   let filtered = activeTag ? clients.filter((c) => (c.tags || []).includes(activeTag)) : clients;
@@ -194,24 +217,57 @@ function Clients() {
             })}
           </div>
         ) : <div />}
-        <button data-testid="new-client-btn" onClick={() => setEditing({ ...EMPTY })}
-          className="bg-[#4A7C94] hover:bg-[#5A8CA4] text-white px-4 py-2 rounded-sm text-sm font-medium flex items-center gap-2 transition-colors">
-          <Plus size={16} /> Add Client
-        </button>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-xs text-[#A1A1AA]" title="Leads scoring at or above this stand out as hot">
+            <Flame size={13} className="text-orange-400" /> Hot ≥
+            <input data-testid="crm-hot-threshold" type="number" min={0} value={threshold}
+              onChange={(e) => setThreshold(e.target.value === "" ? "" : Number(e.target.value))}
+              onBlur={(e) => saveThreshold(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+              className="w-16 bg-[#0A0A0B] border border-[#27272A] focus:border-[#4A7C94] outline-none rounded-sm px-2 py-1.5 text-xs" />
+          </label>
+          <button data-testid="new-client-btn" onClick={() => setEditing({ ...EMPTY })}
+            className="bg-[#4A7C94] hover:bg-[#5A8CA4] text-white px-4 py-2 rounded-sm text-sm font-medium flex items-center gap-2 transition-colors">
+            <Plus size={16} /> Add Client
+          </button>
+        </div>
       </div>
+
+      {selectedIds.size > 0 && (
+        <div data-testid="crm-bulk-bar" className="flex items-center gap-3 flex-wrap mb-4 bg-[#4A7C94]/10 border border-[#4A7C94]/30 rounded-sm px-4 py-3">
+          <span className="text-sm text-[#8FB4C6] font-medium">{selectedIds.size} selected</span>
+          <Select value={bulkStatus} onValueChange={setBulkStatus}>
+            <SelectTrigger data-testid="crm-bulk-status" className="bg-[#0A0A0B] border-[#27272A] w-40 h-9 text-sm"><SelectValue placeholder="Set status…" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="lead">Lead</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="vip">VIP</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
+          <input data-testid="crm-bulk-tag" value={bulkTag} onChange={(e) => setBulkTag(e.target.value)} placeholder="Add tag…"
+            className="bg-[#0A0A0B] border border-[#27272A] focus:border-[#4A7C94] outline-none rounded-sm px-3 py-1.5 text-sm w-40" />
+          <button data-testid="crm-bulk-apply" onClick={runBulk}
+            className="bg-[#4A7C94] hover:bg-[#5A8CA4] text-white px-4 py-1.5 rounded-sm text-sm transition-colors">Apply</button>
+          <button data-testid="crm-bulk-clear" onClick={() => setSelectedIds(new Set())} className="text-xs text-[#71717A] hover:text-white ml-auto">Clear selection</button>
+        </div>
+      )}
+
       <div className="bg-[#121214] border border-[#27272A] rounded-md overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[#27272A] text-left text-[#71717A] text-xs uppercase tracking-wide">
+              <th className="px-4 py-4 w-10"><input type="checkbox" data-testid="crm-select-all" className="accent-[#4A7C94]" checked={filtered.length > 0 && filtered.every((c) => selectedIds.has(c.id))} onChange={() => toggleAll(filtered.map((c) => c.id))} /></th>
               <th className="px-6 py-4">Name</th><th className="px-6 py-4">Company</th><th className="px-6 py-4">Contact</th>
               <th className="px-6 py-4">Tags</th><th className="px-6 py-4">Score</th>
               <th className="px-6 py-4">Status</th><th className="px-6 py-4">Value</th><th className="px-6 py-4"></th>
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 && <tr><td colSpan={8} className="px-6 py-10 text-center text-[#71717A]">No clients{activeTag ? ` tagged "${activeTag}"` : " yet"}.</td></tr>}
+            {filtered.length === 0 && <tr><td colSpan={9} className="px-6 py-10 text-center text-[#71717A]">No clients{activeTag ? ` tagged "${activeTag}"` : " yet"}.</td></tr>}
             {filtered.map((c) => (
-              <tr key={c.id} data-testid={`client-row-${c.id}`} className="border-b border-[#27272A]/60 hover:bg-[#1A1A1D]/40 cursor-pointer" onClick={() => setEditing({ ...c })}>
+              <tr key={c.id} data-testid={`client-row-${c.id}`} className={`border-b border-[#27272A]/60 hover:bg-[#1A1A1D]/40 cursor-pointer ${isHot(c) ? "bg-orange-950/10" : ""}`} onClick={() => setEditing({ ...c })}>
+                <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}><input type="checkbox" data-testid={`client-select-${c.id}`} className="accent-[#4A7C94]" checked={selectedIds.has(c.id)} onChange={() => toggleSel(c.id)} /></td>
                 <td className="px-6 py-4 font-medium">{c.name}</td>
                 <td className="px-6 py-4 text-[#A1A1AA]">{c.company || "—"}</td>
                 <td className="px-6 py-4 text-[#A1A1AA]">{c.email || c.phone || "—"}</td>
@@ -225,7 +281,13 @@ function Clients() {
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  {c.lead_score ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs text-[#4A7C94] bg-[#4A7C94]/15" title="Keyword matches on source page"><Flame size={11} /> {c.lead_score}</span> : <span className="text-[#71717A]">—</span>}
+                  {c.lead_score ? (
+                    <span data-testid={isHot(c) ? `client-hot-${c.id}` : undefined}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs ${isHot(c) ? "text-orange-300 bg-orange-950/50 font-semibold" : "text-[#4A7C94] bg-[#4A7C94]/15"}`}
+                      title={isHot(c) ? "Hot lead" : "Keyword matches on source page"}>
+                      <Flame size={11} /> {c.lead_score}{isHot(c) ? " · HOT" : ""}
+                    </span>
+                  ) : <span className="text-[#71717A]">—</span>}
                 </td>
                 <td className="px-6 py-4"><span className={`px-2 py-1 rounded-sm text-xs ${STATUS[c.status] || STATUS.lead}`}>{c.status}</span></td>
                 <td className="px-6 py-4">${(c.value || 0).toLocaleString()}</td>

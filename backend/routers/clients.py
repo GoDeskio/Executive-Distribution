@@ -58,6 +58,29 @@ async def delete_client(client_id: str, user: dict = Depends(require_perm("crm")
     return {"ok": True}
 
 
+class BulkUpdateInput(BaseModel):
+    ids: List[str]
+    status: Optional[str] = None
+    add_tag: Optional[str] = None
+
+
+@router.post("/clients/bulk")
+async def bulk_update_clients(data: BulkUpdateInput, user: dict = Depends(require_perm("crm"))):
+    oids = [ObjectId(i) for i in data.ids if ObjectId.is_valid(i)]
+    if not oids:
+        raise HTTPException(status_code=400, detail="No valid client ids provided")
+    updated = 0
+    if data.status:
+        res = await db.clients.update_many({"_id": {"$in": oids}}, {"$set": {"status": data.status}})
+        updated = res.modified_count
+    tag = (data.add_tag or "").strip()
+    if tag:
+        res = await db.clients.update_many({"_id": {"$in": oids}}, {"$addToSet": {"tags": tag}})
+        updated = max(updated, res.modified_count)
+    await log_action(user, "update", "client", detail=f"bulk: {len(oids)} client(s), status={data.status}, tag={tag}")
+    return {"ok": True, "matched": len(oids), "updated": updated}
+
+
 @router.get("/clients/{client_id}/documents")
 async def client_documents(client_id: str, user: dict = Depends(require_perm("crm"))):
     docs = await db.documents.find({"client_id": client_id}).sort("created_at", -1).to_list(500)

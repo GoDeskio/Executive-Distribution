@@ -131,4 +131,5 @@ DEFAULT_SETTINGS = {
     "backup_retention": 7,
     "alert_on_backup": False,
     "scraperapi_key": "",
+    "hot_lead_threshold": 5,
 }
