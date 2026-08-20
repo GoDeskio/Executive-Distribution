@@ -25,7 +25,7 @@
   ],
   "updated_files": ["/app/backend/tests/test_refactor_regression.py"],
   "success_rate": {"backend": "100% (28/28 in new regression suite; 12/12 test_rbac.py; 16/17 test_rbac_gated_endpoints.py with 1 known pre-existing xdist race)", "frontend": "skipped"},
-  "test_credentials": "admin@executivedistribution.com / Executive2025! (from /app/memory/test_credentials.md). Throwaway sub-admins are TEST_sub_<uuid>@exd.com created and deleted inside each test/fixture.",
+  "test_credentials": "ADMIN_EMAIL / ADMIN_PASSWORD (from /app/memory/test_credentials.md). Throwaway sub-admins are TEST_sub_<uuid>@exd.com created and deleted inside each test/fixture.",
   "seed_data_creation": "Per-test throwaway records (sub-admins, services, clients, documents, quotes, files) are created and deleted within each test; lockout settings mutated temporarily and restored to prior values (default 5/15).",
   "retest_needed": false,
   "should_main_agent_self_test": false,

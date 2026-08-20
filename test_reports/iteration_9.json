@@ -26,7 +26,7 @@
   ],
   "updated_files": ["/app/frontend/src/App.js", "/app/backend/tests/test_rbac.py"],
   "success_rate": {"backend": "92% (11/12 rbac tests; failure is the real /api/clients bypass bug)", "frontend": "100% after import fix"},
-  "test_credentials": "Super admin: admin@executivedistribution.com / Executive2025!. Test sub-admin (created+deleted during test): crmtest@exd.com / SubPass123!",
+  "test_credentials": "Super admin: ADMIN_EMAIL / ADMIN_PASSWORD. Test sub-admin (created+deleted during test): SUBADMIN_EMAIL / SUBADMIN_PASSWORD",
   "seed_data_creation": "None persisted. Test sub-admin crmtest@exd.com was created and cleaned up.",
   "retest_needed": true,
   "should_main_agent_self_test": true,

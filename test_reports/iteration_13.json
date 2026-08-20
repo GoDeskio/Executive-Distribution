@@ -14,7 +14,7 @@
   ],
   "updated_files": ["/app/backend/tests/test_iter13_updates_audit.py"],
   "success_rate": {"backend": "100%", "frontend": "not tested (backend-only requested)"},
-  "test_credentials": "admin@executivedistribution.com / Executive2025!",
+  "test_credentials": "ADMIN_EMAIL / ADMIN_PASSWORD",
   "seed_data_creation": "Created and deleted throwaway sub-admin TEST_subadmin_*@example.com with permissions [settings, seo]. Set update_repo_url to GoDeskio/Executive-Distribution (left as-is per user instruction). update_token set then cleared. Tagline restored to prior value via fixture teardown.",
   "retest_needed": false,
   "should_main_agent_self_test": false,

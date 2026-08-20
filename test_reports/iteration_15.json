@@ -15,7 +15,7 @@
   ],
   "updated_files": ["/app/backend/tests/test_iter15_research.py"],
   "success_rate": {"backend": "100%", "frontend": "not tested (skipped per request)"},
-  "test_credentials": "admin@executivedistribution.com / Executive2025!",
+  "test_credentials": "ADMIN_EMAIL / ADMIN_PASSWORD",
   "seed_data_creation": "Created and cleaned up throwaway sub-admins (TEST_sub_noperm_*, TEST_sub_research_*) and research docs. scraperapi_key reset to ''.",
   "retest_needed": false,
   "should_main_agent_self_test": false,

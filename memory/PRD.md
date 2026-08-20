@@ -66,7 +66,7 @@ Build a fully dynamic, professional website "Executive Distribution" (Import/Exp
 - AI streams as raw text/plain; frontend reads body stream (lib/chat.js).
 
 ## Test Credentials
-admin@executivedistribution.com / Executive2025!
+`ADMIN_EMAIL` / `ADMIN_PASSWORD` (seeded admin; set in `backend/.env`)
 
 ## Backlog / Next
 - P1: Per-page (non-service) SEO overrides; sitemap.xml + robots.txt generation.

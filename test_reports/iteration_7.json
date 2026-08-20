@@ -26,7 +26,7 @@
   ],
   "updated_files": ["/app/backend/tests/test_iter7_features.py"],
   "success_rate": {"backend": "100% (5/5 new + 7/7 legacy portal tests)", "frontend": "100% (all iter7 flows verified)"},
-  "test_credentials": "admin@executivedistribution.com / Executive2025!",
+  "test_credentials": "ADMIN_EMAIL / ADMIN_PASSWORD",
   "seed_data_creation": "test_iter7_features.py creates and cleans up its own TEST_Iter7_* client + quote doc. Post-run TEST_Iter7 clients were also deleted manually. Existing 'TEST_UI Client' quote EXD-Q-00003 was flipped to 'approved' during UI verification (visible on Dashboard Recent Activity and Documents table).",
   "retest_needed": false,
   "should_main_agent_self_test": false,

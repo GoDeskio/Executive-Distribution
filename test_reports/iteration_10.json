@@ -23,7 +23,7 @@
     "/app/backend/tests/test_rbac_gated_endpoints.py"
   ],
   "success_rate": {"backend": "100% (17/17)", "frontend": "skipped"},
-  "test_credentials": "admin@executivedistribution.com / Executive2025! (from /app/memory/test_credentials.md). Temporary sub-admins are per-run unique (TEST_restricted_<uuid>@exd.com, TEST_permitted_<uuid>@exd.com) and cleaned up in fixture teardown.",
+  "test_credentials": "ADMIN_EMAIL / ADMIN_PASSWORD (from /app/memory/test_credentials.md). Temporary sub-admins are per-run unique (TEST_restricted_<uuid>@exd.com, TEST_permitted_<uuid>@exd.com) and cleaned up in fixture teardown.",
   "seed_data_creation": "Per-run throwaway records (1 quote, 1 service, 1 document, 1 file) created and deleted within fixtures; nothing leaks.",
   "retest_needed": false,
   "should_main_agent_self_test": false,

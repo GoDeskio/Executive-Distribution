@@ -18,7 +18,7 @@
   ],
   "updated_files": ["/app/backend/tests/test_new_features.py"],
   "success_rate": {"backend": "100% (13/13 new tests; iteration-1/2 suite still green)", "frontend": "100% of AI/calc/documents/search flows"},
-  "test_credentials": "admin@executivedistribution.com / Executive2025! (from /app/memory/test_credentials.md)",
+  "test_credentials": "ADMIN_EMAIL / ADMIN_PASSWORD (from /app/memory/test_credentials.md)",
   "seed_data_creation": "Backend tests create/delete TEST_-prefixed documents and files. Playwright creates one 'UITest Client XYZ' quote and deletes it via UI confirm dialog. Seed EXD-Q-00001 (Acme) was still discoverable via /api/search 'EXD-Q-00001' before cleanup.",
   "retest_needed": false,
   "main_agent_can_self_test": true,

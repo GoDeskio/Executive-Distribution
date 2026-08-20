@@ -14,7 +14,7 @@
   ],
   "updated_files": ["/app/backend/tests/test_iter14_backup.py"],
   "success_rate": {"backend": "100% (28/28)", "frontend": "not tested"},
-  "test_credentials": "admin@executivedistribution.com / Executive2025! (superadmin). Throwaway sub-admin created per test module with permissions=['settings','seo'] to prove backup endpoints stay 403 for non-superadmins; cleaned up in fixture teardown.",
+  "test_credentials": "ADMIN_EMAIL / ADMIN_PASSWORD (superadmin). Throwaway sub-admin created per test module with permissions=['settings','seo'] to prove backup endpoints stay 403 for non-superadmins; cleaned up in fixture teardown.",
   "seed_data_creation": "TEST_sub_<hex>@example.com sub-admin (auto-deleted). BACKUP-RT-<hex> client created, deleted, restored via backup, then deleted again for cleanup. One temporary server backup created via /api/backup/save and deleted via /api/backup/server/{filename}.",
   "retest_needed": false,
   "should_main_agent_self_test": false,
