@@ -21,7 +21,7 @@
   ],
   "updated_files": ["/app/backend/tests/backend_test.py"],
   "success_rate": {"backend": "100% (13/13)", "frontend": "100% (all critical flows)"},
-  "test_credentials": "admin@executivedistribution.com / Executive2025! (from /app/memory/test_credentials.md)",
+  "test_credentials": "ADMIN_EMAIL / ADMIN_PASSWORD (from /app/memory/test_credentials.md)",
   "seed_data_creation": "Tests create and clean up TEST_/UI_TEST_ prefixed services, clients, files, and a tracking session. Post-test cleanup script executed to remove residual UI-created items.",
   "retest_needed": false,
   "main_agent_can_self_test": true,

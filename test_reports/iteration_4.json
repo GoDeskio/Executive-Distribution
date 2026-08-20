@@ -19,7 +19,7 @@
   ],
   "updated_files": [],
   "success_rate": { "backend": "100%", "frontend": "100%" },
-  "test_credentials": "admin@executivedistribution.com / Executive2025!",
+  "test_credentials": "ADMIN_EMAIL / ADMIN_PASSWORD",
   "seed_data_creation": "Created 1 test client via POST /api/clients: TEST_UI Client (UITest LLC, id 6a5bb8a6fdd01c537c0a841f) and 1 quote EXD-Q-00003 with generated PDF. Safe to leave or delete.",
   "retest_needed": false,
   "should_main_agent_self_test": false,

@@ -23,7 +23,7 @@
   ],
   "updated_files": ["/app/backend/tests/test_client_portal.py"],
   "success_rate": {"backend": "100% (7/7)", "frontend": "100% (all portal flows verified)"},
-  "test_credentials": "admin@executivedistribution.com / Executive2025!",
+  "test_credentials": "ADMIN_EMAIL / ADMIN_PASSWORD",
   "seed_data_creation": "Reused existing 'TEST_UI Client' (with existing quote EXD-Q-00003 and generated PDF). Portal token generated and then revoked to leave state clean. Backend tests create/delete their own TEST_ clients and documents.",
   "retest_needed": false,
   "should_main_agent_self_test": false,

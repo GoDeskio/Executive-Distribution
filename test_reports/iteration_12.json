@@ -15,7 +15,7 @@
   ],
   "updated_files": [],
   "success_rate": {"backend": "100% (16/16)", "frontend": "N/A"},
-  "test_credentials": "admin@executivedistribution.com / Executive2025! (from /app/memory/test_credentials.md)",
+  "test_credentials": "ADMIN_EMAIL / ADMIN_PASSWORD (from /app/memory/test_credentials.md)",
   "seed_data_creation": "Created and deleted throwaway sub-admins (TEST_noseo_*, TEST_seo_*, TEST_nocrm_*) and temp client/service/document with TEST_ prefixes. All cleaned up. indexnow_key and search_engine_ping_enabled reset to '' / False.",
   "retest_needed": false,
   "main_agent_can_self_test": true,

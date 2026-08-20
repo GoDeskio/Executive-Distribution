@@ -28,7 +28,7 @@
     "/app/backend/tests/test_iter5_features.py (new)"
   ],
   "success_rate": {"backend": "100%", "frontend": "100%"},
-  "test_credentials": "admin@executivedistribution.com / Executive2025!",
+  "test_credentials": "ADMIN_EMAIL / ADMIN_PASSWORD",
   "seed_data_creation": "Test documents (TEST_*) created and cleaned up. Settings restored to email_provider=none, empty from, empty key after tests.",
   "retest_needed": false,
   "main_agent_can_self_test": true,
